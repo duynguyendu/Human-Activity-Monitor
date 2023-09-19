@@ -1,16 +1,19 @@
 from typing import List, Tuple
-
 import numpy as np
-import torch
 import cv2
 
 
 
 def extract_frames(path: str) -> np.ndarray[np.ndarray]:
-    """Create list of frames from video"""
+    """
+    Create list of frames from video
+    """
+    if not isinstance(path, str):
+        raise TypeError("Path must be string.")
 
-    cap = cv2.VideoCapture(str(path))
-    assert cap.isOpened(), "Error: Could not open video file."
+    cap = cv2.VideoCapture(path)
+    if not cap.isOpened():
+        raise FileNotFoundError("Could not open video file.")
 
     frames = []
     while True:
@@ -31,4 +34,3 @@ def patching(image: np.ndarray, patch_size: Tuple[int, int]) -> np.ndarray[np.nd
             patch = image[y:y + patch_size[1], x:x + patch_size[0]]
             patches.append(patch)
     return np.array(patches)
-
