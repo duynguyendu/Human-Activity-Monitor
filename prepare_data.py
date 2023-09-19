@@ -1,3 +1,4 @@
+from utils import extract_frames
 from multiprocessing import Pool
 from pathlib import Path
 from typing import List
@@ -8,27 +9,6 @@ from rich.progress import track
 from PIL import Image
 import numpy as np
 
-
-
-def extract_frames(path: str) -> np.ndarray[np.ndarray]:
-    """
-    Create list of frames from video
-    """
-    if not isinstance(path, str):
-        raise TypeError("Path must be string.")
-
-    cap = cv2.VideoCapture(path)
-    if not cap.isOpened():
-        raise FileNotFoundError("Could not open video file.")
-
-    frames = []
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        frames.append(frame)
-    cap.release()
-    return np.array(frames)
 
 
 def cap_frame(video: np.ndarray, max_frame: int) -> np.ndarray:
