@@ -4,7 +4,7 @@ import cv2
 
 
 
-def extract_frames(path: str) -> np.ndarray[np.ndarray]:
+def extract_frames(path: str, return_fps: bool=False) -> np.ndarray[np.ndarray]:
     """
     Create list of frames from video
     """
@@ -15,6 +15,8 @@ def extract_frames(path: str) -> np.ndarray[np.ndarray]:
     if not cap.isOpened():
         raise FileNotFoundError("Could not open video file.")
 
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+
     frames = []
     while True:
         ret, frame = cap.read()
@@ -22,7 +24,11 @@ def extract_frames(path: str) -> np.ndarray[np.ndarray]:
             break
         frames.append(frame)
     cap.release()
-    return np.array(frames)
+
+    if return_fps:
+        return np.array(frames), fps
+    else:
+        return np.array(frames)
 
 
 def patching(image: np.ndarray, patch_size: Tuple[int, int]) -> np.ndarray[np.ndarray]:
