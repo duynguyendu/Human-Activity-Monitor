@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from collections import Counter
 import numpy as np
 from rich import traceback
 traceback.install()
@@ -9,7 +10,7 @@ import torchvision.transforms as T
 from torchvision.datasets import ImageFolder
 from lightning.pytorch import seed_everything
 from modules.data import VideoProcessing
-from models.VGG import VGG19
+from models.VGG import VGG11
 import cv2
 
 
@@ -36,13 +37,13 @@ def main(args):
     classes = dataset.classes
 
     # Define model
-    model = VGG19(num_classes=11, hidden_features=256)
-    model.load("HAR/9e2h6wnn/checkpoints/last.ckpt")
+    model = VGG11(num_classes=11, hidden_features=128)
+    model.load("HAR/wsjfmhdm/checkpoints/epoch=17-step=9036.ckpt")
 
-    VP = VideoProcessing(2, 0, (700, 700))
+    VP = VideoProcessing(1, 0, (700, 700))
 
-    video = VP("data/UCF11/swing/v_swing_05/v_swing_05_04.mpg")
-
+    video = VP("data/UCF11/trampoline_jumping/v_jumping_08/v_jumping_08_04.mpg")
+    print(len(video))
 
     results = []
     for frame in video:
@@ -52,12 +53,16 @@ def main(args):
             outputs = model(X.unsqueeze(0))
             _, pred = torch.max(outputs, 1)
             results.append(pred.item())
-        if len(results) >= 10:
-            results.pop()
+        if len(results) > 4:
+            results = sorted(results, key=lambda x: Counter(results)[x])
+            results = results[1:-1]
+
+        unique_items, counts = np.unique(results, return_counts=True)
+        most_frequent_index = np.argmax(counts)
 
         cv2.putText(
             frame, 
-            classes[int(np.mean(results))], 
+            classes[unique_items[most_frequent_index]], 
             (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 
             1, (255, 0, 0), 3
         )
