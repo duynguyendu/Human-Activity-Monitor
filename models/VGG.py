@@ -1,3 +1,4 @@
+from modules.model import LitModel
 import torch.nn as nn
 
 
@@ -10,15 +11,17 @@ config = {
 }
 
 
-class VGG(nn.Module):
+
+class VGG(LitModel):
     def __init__(
             self, 
             version: int, 
             num_classes: int,
-            hidden_features: int=512, 
-            dropout: float=0.5
+            hidden_features: int = 512, 
+            dropout: float = 0.5
         ):
-        super(VGG, self).__init__()
+        super().__init__()
+        self.num_classes = num_classes
         self.features = self._construction(version)
         self.classifier = nn.Sequential(
             nn.Flatten(),
@@ -30,6 +33,7 @@ class VGG(nn.Module):
             nn.Dropout(dropout),
             nn.Linear(hidden_features, num_classes)
         )
+
 
     def _construction(self, name):
         sequence = nn.Sequential()
@@ -48,7 +52,32 @@ class VGG(nn.Module):
                 in_channels = x
         return sequence
 
+
     def forward(self, x):
         out = self.features(x)
         out = self.classifier(out)
         return out
+
+
+
+class VGG11(VGG):
+    def __init__(self, num_classes: int, hidden_features: int = 512, dropout: float = 0.5):
+        super().__init__("11", num_classes, hidden_features, dropout)
+
+
+
+class VGG13(VGG):
+    def __init__(self, num_classes: int, hidden_features: int = 512, dropout: float = 0.5):
+        super().__init__("13", num_classes, hidden_features, dropout)
+
+
+
+class VGG16(VGG):
+    def __init__(self, num_classes: int, hidden_features: int = 512, dropout: float = 0.5):
+        super().__init__("16", num_classes, hidden_features, dropout)
+
+
+
+class VGG19(VGG):
+    def __init__(self, num_classes: int, hidden_features: int = 512, dropout: float = 0.5):
+        super().__init__("19", num_classes, hidden_features, dropout)

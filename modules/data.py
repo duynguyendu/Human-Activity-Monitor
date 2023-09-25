@@ -1,4 +1,4 @@
-from typing import Any, List, Callable, Optional, Tuple, Union
+from typing import Any, List, Tuple, Union
 from multiprocessing import Pool
 from pathlib import Path
 import shutil
@@ -7,10 +7,8 @@ import os
 import torch
 import torchvision.transforms as T
 from lightning.pytorch import LightningDataModule
-from torch.utils.data import Dataset, DataLoader, random_split
-from torchvision.datasets import VisionDataset, ImageFolder
-from torchvision.io import read_video
-from rich.progress import track
+from torch.utils.data import DataLoader, random_split
+from torchvision.datasets import ImageFolder
 from PIL import Image
 import numpy as np
 import cv2
@@ -36,14 +34,19 @@ class VideoProcessing():
     def load(self, path: str) -> np.ndarray:
         if not os.path.exists(path):
             raise FileExistsError("File not found!")
-        return read_video(path, pts_unit="sec")[0].numpy()
+        video = cv2.VideoCapture(path)
+        if not video.isOpened():
+            raise RuntimeError("Could not open video file.")
+        output = [frame for _, frame in iter(video.read, (False, None))]
+        video.release()
+        return output
 
 
     def sampling(self, video: np.ndarray, value: int) -> np.ndarray:
         """
         Pick up 1 frame every n frame (n = value)
         """
-        return video[::value, ...]
+        return video[::value] if value else video
 
 
     def balancing(self, video: np.ndarray, value: int) -> np.ndarray:
@@ -97,6 +100,7 @@ class UCF11DataModule(LightningDataModule):
             num_workers: int = 0,
             pin_memory: bool = True,
         ):
+        super().__init__()
         self.root = data_path
         self.limit = data_limit
         self.x_path = data_path + "_x"
@@ -167,6 +171,19 @@ class UCF11DataModule(LightningDataModule):
             img.save(f"{save_path}/{j}.jpg")
 
 
+    def _load(self, path: List[str]):
+        """
+        Load data from list of path
+        """
+        data = self.transform(Image.open(path))
+        label = torch.as_tensor(
+            self.classes.index(
+                path.replace(self.x_path, "").split("/")[1]
+            )
+        )
+        return data, label
+
+
     def prepare_data(self):
         """
         Preprocess data
@@ -192,19 +209,6 @@ class UCF11DataModule(LightningDataModule):
         with Pool(self.workers) as pool:
             pool.map(self._processing, path_list)
         print("Processing data. Done")
-
-
-    def _load(self, path: List[str]):
-        """
-        Load data from list of path
-        """
-        data = self.transform(Image.open(path))
-        label = torch.as_tensor(
-            self.classes.index(
-                path.replace(self.x_path, "").split("/")[1]
-            )
-        )
-        return data, label
 
 
     def setup(self, stage: str):
