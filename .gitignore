@@ -3,3 +3,6 @@ data/
 processed_data/
 *.pyc
 test.py
+lightning_logs/
+wandb/
+HAR/
