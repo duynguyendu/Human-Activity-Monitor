@@ -7,7 +7,8 @@ import os
 import torch
 import torchvision.transforms as T
 from lightning.pytorch import LightningDataModule
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
 from PIL import Image
 import numpy as np
@@ -217,16 +218,29 @@ class UCF11DataModule(LightningDataModule):
         """
         if not hasattr(self, "data_train"):
             self.dataset = ImageFolder(self.x_path, self.transform)
-            self.data_train, self.data_val, self.data_test = random_split(self.dataset, lengths=self.split_size)
+            data_size = len(self.dataset)
+            indices = list(range(data_size))
+            np.random.shuffle(indices)
+
+            train_size = int(self.split_size[0] * data_size)
+            val_size = int(self.split_size[1] * data_size)
+
+            train_indices = indices[:train_size]
+            val_indices = indices[train_size:train_size + val_size]
+            test_indices = indices[train_size + val_size:]
+
+            self.train_sampler = SubsetRandomSampler(train_indices)
+            self.val_sampler = SubsetRandomSampler(val_indices)
+            self.test_sampler = SubsetRandomSampler(test_indices)
 
 
     def train_dataloader(self):
-        return DataLoader(dataset=self.data_train, **self.dl_conf, shuffle=True)
+        return DataLoader(dataset=self.dataset, **self.dl_conf, sampler=self.train_sampler)
 
 
     def val_dataloader(self):
-        return DataLoader(dataset=self.data_val, **self.dl_conf, shuffle=False)
+        return DataLoader(dataset=self.dataset, **self.dl_conf, sampler=self.val_sampler)
 
 
     def test_dataloader(self):
-        return DataLoader(dataset=self.data_test, **self.dl_conf, shuffle=False)
+        return DataLoader(dataset=self.dataset, **self.dl_conf, sampler=self.test_sampler)
