@@ -4,7 +4,7 @@ import os
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
-from torchmetrics.functional import accuracy, f1_score
+from torchmetrics.functional import accuracy
 from lightning.pytorch import LightningModule
 
 
@@ -26,9 +26,8 @@ class LitModel(LightningModule):
 
     def _log(self, stage: str, loss, y_hat, y):
         acc = accuracy(y_hat, y, task='multiclass', num_classes=self.num_classes)
-        f1 = f1_score(y_hat, y, task='multiclass', num_classes=self.num_classes)
         self.log_dict(
-            {f"{stage}/loss": loss, f"{stage}/accuracy": acc, f"{stage}/f1_score": f1},
+            {f"{stage}/loss": loss, f"{stage}/accuracy": acc},
             on_step=False, on_epoch=True
         )
 
