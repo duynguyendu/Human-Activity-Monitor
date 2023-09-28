@@ -11,7 +11,7 @@ from torchvision.models.vgg import (
 
 class VGGModule(nn.Module):
     def __init__(
-            self, features: nn.Module, num_classes: int,  hidden_features: int=4096, dropout: int=0.5, freeze: bool=False
+            self, features: nn.Module, num_classes: int,  hidden_features: int = 4096, dropout: int = 0.5, freeze: bool = False
         ) -> None:
         super().__init__()
         self.model = features
@@ -37,7 +37,7 @@ class VGGModule(nn.Module):
 
 class VGG11(VGGModule):
     def __init__(
-            self, num_classes: int, hidden_features: int=4069, dropout: int=0.5, pretrained: bool=False, freeze: bool=False
+            self, num_classes: int, hidden_features: int = 4069, dropout: int = 0.5, pretrained: bool = False, freeze: bool = False
         ) -> None:
         super().__init__(
             vgg11_bn(weights=VGG11_BN_Weights.DEFAULT if pretrained else None), 
@@ -48,7 +48,7 @@ class VGG11(VGGModule):
 
 class VGG13(VGGModule):
     def __init__(
-            self, num_classes: int, hidden_features: int=4069, dropout: int=0.5, pretrained: bool=False, freeze: bool=False
+            self, num_classes: int, hidden_features: int = 4069, dropout: int = 0.5, pretrained: bool = False, freeze: bool = False
         ) -> None:
         super().__init__(
             vgg13_bn(weights=VGG13_BN_Weights.DEFAULT if pretrained else None), 
@@ -59,7 +59,7 @@ class VGG13(VGGModule):
 
 class VGG16(VGGModule):
     def __init__(
-            self, num_classes: int, hidden_features: int=4069, dropout: int=0.5, pretrained: bool=False, freeze: bool=False
+            self, num_classes: int, hidden_features: int = 4069, dropout: int = 0.5, pretrained: bool = False, freeze: bool = False
         ) -> None:
         super().__init__(
             vgg16_bn(weights=VGG16_BN_Weights.DEFAULT if pretrained else None), 
@@ -70,7 +70,7 @@ class VGG16(VGGModule):
 
 class VGG19(VGGModule):
     def __init__(
-            self, num_classes: int, hidden_features: int=4069, dropout: int=0.5, pretrained: bool=False, freeze: bool=False
+            self, num_classes: int, hidden_features: int = 4069, dropout: int = 0.5, pretrained: bool = False, freeze: bool = False
         ) -> None:
         super().__init__(
             vgg19_bn(weights=VGG19_BN_Weights.DEFAULT if pretrained else None), 
