@@ -8,14 +8,10 @@ class PrintTrainResult(cb.Callback):
     def on_train_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         epoch = trainer.current_epoch
         results = trainer.callback_metrics
-        result_train = ', '.join([
-            f"loss: {results['train/loss']:.4f}",
-            f"acc: {results['train/accuracy']:.3f}",
-        ])
-        result_val = ', '.join([
-            f"loss: {results['val/loss']:.4f}",
-            f"acc: {results['val/accuracy']:.3f}",
-        ])
+
+        result_train = f"loss: {results['train/loss']:.4f}, acc: {results['train/accuracy']:.3f}"
+        result_val = f"loss: {results['val/loss']:.4f}, acc: {results['val/accuracy']:.3f}"
+
         print(f"[bold]Epoch[/]( {epoch} )  [bold]Train[/]({result_train})  [bold]Val[/]({result_val})")
 
 
@@ -29,13 +25,10 @@ callbacks_list = [
         save_weights_only=True,
         save_top_k=2,
         save_last=True
+    ),
+    cb.EarlyStopping(
+        monitor='val/loss',
+        min_delta=0.0001,
+        patience=3
     )
 ]
-
-#     cb_list.append(
-#         cb.EarlyStopping(
-#             monitor='val/loss',
-#             min_delta=0.0001,
-#             patience=config['earlystopping']['patience']
-#         )
-#     ) if config['earlystopping']['enable'] else None

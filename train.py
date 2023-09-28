@@ -1,7 +1,7 @@
 from modules.callback import callbacks_list
 from modules.data import UCF11DataModule
 from modules.model import LitModel
-from models import VGG11
+from models import VGG11, ViT_B_16
 
 from argparse import ArgumentParser
 import os
@@ -33,7 +33,7 @@ def main(args):
     )
 
     # Define model
-    model = VGG11(num_classes=11, hidden_features=256, pretrained=True, freeze=True)
+    model = ViT_B_16(num_classes=11, pretrained=True, freeze=True)
     lit_model = LitModel(
         model = model,
         criterion = nn.CrossEntropyLoss(),
