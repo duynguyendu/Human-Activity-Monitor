@@ -1,4 +1,3 @@
-from modules.model import LitModel
 import torch.nn as nn
 
 
@@ -12,7 +11,7 @@ config = {
 
 
 
-class VGG(LitModel):
+class VGG(nn.Module):
     def __init__(
             self, 
             version: int, 
