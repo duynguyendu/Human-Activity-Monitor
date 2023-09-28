@@ -14,11 +14,11 @@ class VGGModule(nn.Module):
             self, features: nn.Module, num_classes: int,  hidden_features: int = 4096, dropout: int = 0.5, freeze: bool = False
         ) -> None:
         super().__init__()
+        self.num_classes = num_classes
         self.model = features
         if freeze:
-            for param in self.parameters():
+            for param in self.model.parameters():
                 param.requires_grad = False
-        self.num_classes = num_classes
         self.model.classifier = nn.Sequential(
             nn.Linear(512 * 7 * 7, hidden_features),
             nn.ReLU(True),
