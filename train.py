@@ -1,7 +1,7 @@
 from modules.callback import callbacks_list
 from modules.data import UCF11DataModule
 from modules.model import LitModel
-from models import VGG19
+from models import VGG11
 
 from argparse import ArgumentParser
 import os
@@ -26,14 +26,14 @@ NUM_WOKER = int(os.cpu_count()*0.6) if torch.cuda.is_available() else 0
 def main(args):
     # Define dataset
     dataset = UCF11DataModule(
-        data_path="data/UCF11", 
-        sampling_value=3,
-        batch_size=args.batch,
-        num_workers=NUM_WOKER
+        data_path = "data/UCF11", 
+        sampling_value = 3,
+        batch_size = args.batch,
+        num_workers = NUM_WOKER
     )
 
     # Define model
-    model = VGG19(num_classes=11, hidden_features=256)
+    model = VGG11(num_classes=11, hidden_features=256, pretrained=True, freeze=True)
     lit_model = LitModel(
         model = model,
         criterion = nn.CrossEntropyLoss(),
@@ -43,9 +43,9 @@ def main(args):
 
     # Define trainer
     trainer = Trainer(
-        max_epochs=args.epoch, 
-        precision="16-mixed",
-        callbacks=callbacks_list
+        max_epochs = args.epoch, 
+        precision = "16-mixed",
+        callbacks = callbacks_list
     )
 
     # Training

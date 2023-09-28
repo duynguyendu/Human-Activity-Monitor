@@ -1,82 +1,79 @@
+import torch
 import torch.nn as nn
+from torchvision.models.vgg import (
+    vgg11_bn, VGG11_BN_Weights, 
+    vgg13_bn, VGG13_BN_Weights,
+    vgg16_bn, VGG16_BN_Weights, 
+    vgg19_bn, VGG19_BN_Weights,
+)
 
 
 
-config = {
-    '11': [64, 'P', 128, 'P', 256, 256, 'P', 512, 512, 'P', 512, 512, 'P'],
-    '13': [64, 64, 'P', 128, 128, 'P', 256, 256, 'P', 512, 512, 'P', 512, 512, 'P'],
-    '16': [64, 64, 'P', 128, 128, 'P', 256, 256, 256, 'P', 512, 512, 512, 'P', 512, 512, 512, 'P'],
-    '19': [64, 64, 'P', 128, 128, 'P', 256, 256, 256, 256, 'P', 512, 512, 512, 512, 'P', 512, 512, 512, 512, 'P'],
-}
-
-
-
-class VGG(nn.Module):
+class VGGModule(nn.Module):
     def __init__(
-            self, 
-            version: int, 
-            num_classes: int,
-            hidden_features: int = 512, 
-            dropout: float = 0.5
-        ):
+            self, features: nn.Module, num_classes: int,  hidden_features: int=4096, dropout: int=0.5, freeze: bool=False
+        ) -> None:
         super().__init__()
+        self.model = features
+        if freeze:
+            for param in self.parameters():
+                param.requires_grad = False
         self.num_classes = num_classes
-        self.features = self._construction(version)
-        self.classifier = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(512*7*7, hidden_features),
+        self.model.classifier = nn.Sequential(
+            nn.Linear(512 * 7 * 7, hidden_features),
             nn.ReLU(True),
-            nn.Dropout(dropout),
+            nn.Dropout(p=dropout),
             nn.Linear(hidden_features, hidden_features),
             nn.ReLU(True),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_features, num_classes)
+            nn.Dropout(p=dropout),
+            nn.Linear(hidden_features, num_classes),
         )
 
 
-    def _construction(self, name):
-        sequence = nn.Sequential()
-        in_channels = 3
-        for x in config[name]:
-            if x == 'P':
-                sequence.extend([
-                    nn.MaxPool2d(kernel_size=2, stride=2)
-                ])
-            else:
-                sequence.extend([
-                    nn.Conv2d(in_channels, x, kernel_size=3, padding=1),
-                    nn.BatchNorm2d(x),
-                    nn.ReLU(True)
-                ])
-                in_channels = x
-        return sequence
-
-
-    def forward(self, x):
-        out = self.features(x)
-        out = self.classifier(out)
-        return out
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.model(x)
 
 
 
-class VGG11(VGG):
-    def __init__(self, num_classes: int, hidden_features: int = 512, dropout: float = 0.5):
-        super().__init__("11", num_classes, hidden_features, dropout)
+class VGG11(VGGModule):
+    def __init__(
+            self, num_classes: int, hidden_features: int=4069, dropout: int=0.5, pretrained: bool=False, freeze: bool=False
+        ) -> None:
+        super().__init__(
+            vgg11_bn(weights=VGG11_BN_Weights.DEFAULT if pretrained else None), 
+            num_classes, hidden_features, dropout, 
+            freeze if pretrained else False
+        )
 
 
-
-class VGG13(VGG):
-    def __init__(self, num_classes: int, hidden_features: int = 512, dropout: float = 0.5):
-        super().__init__("13", num_classes, hidden_features, dropout)
-
-
-
-class VGG16(VGG):
-    def __init__(self, num_classes: int, hidden_features: int = 512, dropout: float = 0.5):
-        super().__init__("16", num_classes, hidden_features, dropout)
-
+class VGG13(VGGModule):
+    def __init__(
+            self, num_classes: int, hidden_features: int=4069, dropout: int=0.5, pretrained: bool=False, freeze: bool=False
+        ) -> None:
+        super().__init__(
+            vgg13_bn(weights=VGG13_BN_Weights.DEFAULT if pretrained else None), 
+            num_classes, hidden_features, dropout, 
+            freeze if pretrained else False
+        )
 
 
-class VGG19(VGG):
-    def __init__(self, num_classes: int, hidden_features: int = 512, dropout: float = 0.5):
-        super().__init__("19", num_classes, hidden_features, dropout)
+class VGG16(VGGModule):
+    def __init__(
+            self, num_classes: int, hidden_features: int=4069, dropout: int=0.5, pretrained: bool=False, freeze: bool=False
+        ) -> None:
+        super().__init__(
+            vgg16_bn(weights=VGG16_BN_Weights.DEFAULT if pretrained else None), 
+            num_classes, hidden_features, dropout, 
+            freeze if pretrained else False
+        )
+
+
+class VGG19(VGGModule):
+    def __init__(
+            self, num_classes: int, hidden_features: int=4069, dropout: int=0.5, pretrained: bool=False, freeze: bool=False
+        ) -> None:
+        super().__init__(
+            vgg19_bn(weights=VGG19_BN_Weights.DEFAULT if pretrained else None), 
+            num_classes, hidden_features, dropout, 
+            freeze if pretrained else False
+        )
