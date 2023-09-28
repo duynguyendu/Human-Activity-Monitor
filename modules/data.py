@@ -1,15 +1,19 @@
-from typing import Any, List, Tuple, Union
+from collections import Counter
+from typing import List, Tuple, Union
 from multiprocessing import Pool
 from pathlib import Path
-import shutil
+from rich import print
+import glob
 import os
 
-import torch
 import torchvision.transforms as T
-from lightning.pytorch import LightningDataModule
-from torch.utils.data.sampler import SubsetRandomSampler
-from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
+from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data import Dataset, DataLoader
+
+from lightning.pytorch import LightningDataModule
+
+from sklearn.model_selection import train_test_split
 from PIL import Image
 import numpy as np
 import cv2
@@ -86,35 +90,43 @@ class VideoProcessing():
 
 
 
+class CustomImageDataset(Dataset):
+    def __init__(self, image_paths, labels, transform=None):
+        self.image_paths = image_paths
+        self.labels = labels
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, index):
+        image = Image.open(self.image_paths[index])
+        label = self.labels[index]
+        if self.transform:
+            image = self.transform(image)
+        return image, label
+
+
+
 class UCF11DataModule(LightningDataModule):
     def __init__(
             self, 
             data_path: str, 
-            data_limit: Union[int, float] = None,
-            remake_data: bool = False,
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
-            sampling_value: int = 6,
-            num_frames: int = 32,
+            sampling_value: int = 0,
+            num_frames: int = 0,
             image_size: Tuple[int, int] = (224, 224),
-            chunk_size: int = 100,
             num_workers: int = 0,
             pin_memory: bool = True,
         ):
         super().__init__()
         self.root = data_path
-        self.limit = data_limit
         self.x_path = data_path + "_x"
-        self.remake = remake_data
         self.split_size = train_val_test_split
-        self.chunk_size = chunk_size
         self.workers = num_workers
-        self.video_setting = {
-            "sampling_value": sampling_value,
-            "num_frames": num_frames,
-            "size": image_size,
-        }
-        self.dl_conf = {
+        self.processer = VideoProcessing(sampling_value, num_frames, image_size)
+        self.loader_config = {
             "batch_size": batch_size,
             "num_workers": num_workers,
             "pin_memory": pin_memory,
@@ -123,124 +135,169 @@ class UCF11DataModule(LightningDataModule):
             T.Resize(image_size, antialias=True),
             T.ToTensor(),
             T.Normalize(
-                mean=[0.485, 0.456, 0.406], 
-                std=[0.229, 0.224, 0.225]
+                mean = [0.485, 0.456, 0.406], 
+                std = [0.229, 0.224, 0.225]
             )
         ])
 
 
-    def _limit(self, data: List, limit_value: Union[int, float]=None) -> List:
-        """
-        Limit data
-        """
-        if not limit_value:
-            return data
-        if limit_value > len(data):
-            raise ValueError(
-                "The limit value must be smaller than the list length "
-                "or between 0 and 1 if it is a float."
-            )
-        if 0 < limit_value < 1:
-            limit_value = int(len(data)*limit_value)
-        return data[:limit_value]
 
-
-    def _chunking(self, input_list: List[Any], chunk_size: int) -> List[List]:
-        """
-        Divide list into smaller chunk
-        """
-        return [input_list[i:i + chunk_size] for i in range(0, len(input_list), chunk_size)]
+    @property
+    def classes(self) -> List[str]:
+        return sorted(os.listdir(self.x_path))
 
 
     def _processing(self, path: str) -> None:
         """
         process and save processed video
         """
-        splitted_path = path.split("/")
-        file_path = "/".join(splitted_path[2:-1])
-        file_name = splitted_path[-1].split(".")[0]
-        save_path = f"{self.x_path}/{file_path}/{file_name}"
-
-        os.makedirs(save_path, exist_ok=True)
-
-        VP = VideoProcessing(**self.video_setting)
-
-        video = VP(path)
-
-        for j, frame in enumerate(video):
-            img = Image.fromarray(frame)
-            img.save(f"{save_path}/{j}.jpg")
+        label = path.replace(self.root, "").split("/")[1]
+        folder_path = os.path.join(self.x_path, label)
+        file_name = path.split("/")[-1][:-4]
+        os.makedirs(folder_path, exist_ok=True)
+        video = self.processer(path)
+        for i, frame in enumerate(video):
+            save_path = os.path.join(folder_path, f"{file_name}_{i}.jpg")
+            if not os.path.exists(save_path):
+                img = Image.fromarray(frame)
+                img.save(save_path)
 
 
-    def _load(self, path: List[str]):
-        """
-        Load data from list of path
-        """
-        data = self.transform(Image.open(path))
-        label = torch.as_tensor(
-            self.classes.index(
-                path.replace(self.x_path, "").split("/")[1]
-            )
-        )
-        return data, label
+    def _generate_x_data(self):
+        print("[bold]Processing data:[/] Working...", end="\r")
+        os.makedirs(self.x_path, exist_ok=True)
+
+        path_list = list(str(video) for video in Path(self.root).rglob(f'*.mpg'))
+
+        with Pool(self.workers) as pool:
+            pool.map(self._processing, path_list)
+        print("[bold]Processing data:[/] Done      ")
 
 
     def prepare_data(self):
         """
         Preprocess data
         """
-        if not os.path.exists("data/UCF11"):
-            raise FileNotFoundError("Dataset not found! ('data/UCF11')")
-
-        save_folder = self.root + "_x"
-
-        if os.path.exists(save_folder):
-            if self.remake:
-                shutil.rmtree(save_folder)
-            else:
-                print("Prepared data existed. Skiping...")
-                return
-
-        print("Processing data...", end="\r")
-        os.makedirs(save_folder, exist_ok=True)
-
-        path_list = [str(video) for video in Path(self.root).rglob(f'*.mpg')]
-        path_list = self._limit(path_list, self.limit)
-
-        with Pool(self.workers) as pool:
-            pool.map(self._processing, path_list)
-        print("Processing data. Done")
+        if not os.path.exists(self.root):
+            raise FileNotFoundError(self.root)
+        if not os.path.exists(self.x_path):
+            self._generate_x_data()
+        else:
+            print("[bold]Processing data:[/] Existed")
 
 
     def setup(self, stage: str):
         """
         Setup data
         """
-        if not hasattr(self, "data_train"):
-            self.dataset = ImageFolder(self.x_path, self.transform)
-            data_size = len(self.dataset)
-            indices = list(range(data_size))
-            np.random.shuffle(indices)
-
-            train_size = int(self.split_size[0] * data_size)
-            val_size = int(self.split_size[1] * data_size)
-
-            train_indices = indices[:train_size]
-            val_indices = indices[train_size:train_size + val_size]
-            test_indices = indices[train_size + val_size:]
-
-            self.train_sampler = SubsetRandomSampler(train_indices)
-            self.val_sampler = SubsetRandomSampler(val_indices)
-            self.test_sampler = SubsetRandomSampler(test_indices)
+        if not hasattr(self, "dataset"):
+            self.dataset, self.labels = [], []
+            for class_name in self.classes:
+                class_dir = os.path.join(self.x_path, class_name)
+                image_paths = glob.glob(os.path.join(class_dir, '*.jpg'))
+                self.dataset.extend(image_paths)
+                self.labels.extend([self.classes.index(class_name)] * len(image_paths))
+            X_train, X_val_test, y_train, y_val_test = train_test_split(
+                self.dataset, self.labels, 
+                train_size = self.split_size[0], 
+                stratify = self.labels,
+                shuffle = True
+            )
+            X_val, X_test, y_val, y_test = train_test_split(
+                X_val_test, y_val_test, 
+                test_size = self.split_size[2] / sum(self.split_size[1:]), 
+                stratify = y_val_test,
+                shuffle = True
+            )
+            self.train_data = CustomImageDataset(X_train, y_train, self.transform)
+            self.val_data = CustomImageDataset(X_val, y_val, self.transform)
+            self.test_data = CustomImageDataset(X_test, y_test, self.transform)
+        if stage == "fit":
+            print(f"[bold]Dataset size:[/] {len(self.dataset):,}")
+            print(f"[bold]Number of classes:[/] {len(self.classes):,}")
 
 
     def train_dataloader(self):
-        return DataLoader(dataset=self.dataset, **self.dl_conf, sampler=self.train_sampler)
+        return DataLoader(dataset=self.train_data, **self.loader_config, shuffle=True)
 
 
     def val_dataloader(self):
-        return DataLoader(dataset=self.dataset, **self.dl_conf, sampler=self.val_sampler)
+        return DataLoader(dataset=self.val_data, **self.loader_config, shuffle=False)
 
 
     def test_dataloader(self):
-        return DataLoader(dataset=self.dataset, **self.dl_conf, sampler=self.test_sampler)
+        return DataLoader(dataset=self.test_data, **self.loader_config, shuffle=False)
+
+
+
+class UTD_MHADDataModule(LightningDataModule):
+    def __init__(
+            self, 
+            data_path: str, 
+            batch_size: int = 32,
+            train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
+            sampling_value: int = 0,
+            num_frames: int = 0,
+            image_size: Tuple[int, int] = (224, 224),
+            num_workers: int = 0,
+            pin_memory: bool = True,
+        ):
+        super().__init__()
+        self.root = data_path
+        self.x_path = data_path + "_x"
+        self.split_size = train_val_test_split
+        self.workers = num_workers
+        self.processer = VideoProcessing(sampling_value, num_frames, image_size)
+        self.loader_config = {
+            "batch_size": batch_size,
+            "num_workers": num_workers,
+            "pin_memory": pin_memory,
+        }
+        self.transform = T.Compose([
+            T.Resize(image_size, antialias=True),
+            T.ToTensor(),
+            T.Normalize(
+                mean = [0.485, 0.456, 0.406], 
+                std = [0.229, 0.224, 0.225]
+            )
+        ])
+
+
+    @property
+    def classes(self) -> List[str]:
+        return os.listdir(self.x_path)
+
+
+    def _processing(self, path: str) -> None:
+        """
+        process and save processed video
+        """
+        labels = { 
+            "a1": "Swipe left", 
+            "a2": "Swipe right", 
+            "a3": "Wave", 
+            "a4": "Clap", 
+            "a5": "Throw", 
+            "a6": "Arm cross", 
+            "a7": "Basketball shoot",
+            "a8": "Draw X",
+            "a9": "Draw circle (forward)",
+            "a10": "Draw circle (backward)",
+            "a11": "Draw triangle",
+            "a12": "Bowling",
+            "a13": "Boxing",
+            "a14": "Baseball swing",
+            "a15": "Tennis swing",
+            "a16": "Arm curl",
+            "a17": "Tennis serve",
+            "a18": "Push",
+            "a19": "Knock",
+            "a20": "Catch",
+            "a21": "Pickup and throw",
+            "a22": "Jog",
+            "a23": "Walk",
+            "a24": "Sit to stand",
+            "a25": "Stand to sit",
+            "a26": "Lunge",
+            "a27": "Squat"
+        }
