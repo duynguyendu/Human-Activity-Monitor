@@ -1,24 +1,28 @@
 from argparse import ArgumentParser
 from collections import Counter
-import numpy as np
-from rich import traceback
-traceback.install()
 import os
 
-import torch
-import torchvision.transforms as T
-from torchvision.datasets import ImageFolder
-from lightning.pytorch import seed_everything
 from modules.data import VideoProcessing
-from models.VGG import VGG11
+from modules.model import LitModel
+from models.VGG import VGG19
+
+from lightning.pytorch import seed_everything
+from torchvision.datasets import ImageFolder
+import torchvision.transforms as T
+import torch
+
 import cv2
+import numpy as np
+from rich import traceback, print
+traceback.install()
 
 
 # Set seed
-# seed_everything(seed=42, workers=True)
+seed_everything(seed=42, workers=True)
 
 # Set number of worker (CPU will be used | Default: 80%)
 NUM_WOKER = int(os.cpu_count()*0.8) if torch.cuda.is_available() else 0
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 transform = T.Compose([
     T.ToPILImage(),
     T.Resize((224, 224), antialias=True),
@@ -33,26 +37,27 @@ transform = T.Compose([
 
 def main(args):
     # Define dataset
-    dataset = ImageFolder(root="data/UCF11_x")
-    classes = dataset.classes
+    classes = sorted(os.listdir("data/UCF11"))
 
     # Define model
-    model = VGG11(num_classes=11, hidden_features=128)
-    model.load("HAR/wsjfmhdm/checkpoints/epoch=17-step=9036.ckpt")
+    model = VGG19(num_classes=11, hidden_features=256)
+    lit_model = LitModel(
+        model = model,
+        checkpoint = "lightning_logs/version_2/checkpoints/epoch=8-step=10089.ckpt"
+    )
 
-    VP = VideoProcessing(1, 0, (700, 700))
+    VP = VideoProcessing(1, 0, (750, 750))
 
-    video = VP("data/UCF11/trampoline_jumping/v_jumping_08/v_jumping_08_04.mpg")
-    print(len(video))
+    video = VP("data/UCF11/horse_riding/v_riding_04/v_riding_04_06.mpg")
 
     results = []
     for frame in video:
-
-        X = transform(frame)
         with torch.inference_mode():
-            outputs = model(X.unsqueeze(0))
+            X = transform(frame)
+            outputs = lit_model(X.unsqueeze(0))
             _, pred = torch.max(outputs, 1)
-            results.append(pred.item())
+
+        results.append(pred.item())
         if len(results) > 4:
             results = sorted(results, key=lambda x: Counter(results)[x])
             results = results[1:-1]
@@ -67,11 +72,9 @@ def main(args):
             1, (255, 0, 0), 3
         )
 
-
         cv2.imshow("a", frame)
         if cv2.waitKey(1) == ord('q'):
             break
-
 
 
 
