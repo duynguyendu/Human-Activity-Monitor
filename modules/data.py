@@ -162,3 +162,114 @@ class UCF11DataModule(CustomDataModule):
                 dst_path = os.path.join(split_path, video_path.split("/")[-1])
                 if not os.path.exists(dst_path):
                     shutil.copyfile(video_path, dst_path)
+
+
+
+class UTD_MHADDataModule(CustomDataModule):
+    def __init__(
+            self, 
+            data_path: str, 
+            batch_size: int = 32,
+            train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
+            sampling_value: int = 0,
+            num_frames: int = 0,
+            image_size: Tuple[int, int] = (224, 224),
+            num_workers: int = 0,
+            pin_memory: bool = True,
+        ):
+        super().__init__(
+            data_path, batch_size, train_val_test_split, sampling_value, num_frames, image_size, num_workers, pin_memory
+        )
+        self.labels = {
+            "a1": "Swipe left", 
+            "a2": "Swipe right", 
+            "a3": "Wave", 
+            "a4": "Clap", 
+            "a5": "Throw", 
+            "a6": "Arm cross", 
+            "a7": "Basketball shoot",
+            "a8": "Draw X",
+            "a9": "Draw circle (forward)",
+            "a10": "Draw circle (backward)",
+            "a11": "Draw triangle",
+            "a12": "Bowling",
+            "a13": "Boxing",
+            "a14": "Baseball swing",
+            "a15": "Tennis swing",
+            "a16": "Arm curl",
+            "a17": "Tennis serve",
+            "a18": "Push",
+            "a19": "Knock",
+            "a20": "Catch",
+            "a21": "Pickup and throw",
+            "a22": "Jog",
+            "a23": "Walk",
+            "a24": "Sit to stand",
+            "a25": "Stand to sit",
+            "a26": "Lunge",
+            "a27": "Squat"
+        }
+
+
+    @property
+    def classes(self) -> List[str]:
+        return sorted(self.labels.values())
+
+
+    def _split_data(self, data: Tuple[str, List[str]]):
+        label, videos = data
+
+        # Create new path train, val, test folder
+        dst_paths = [os.path.join(self.temp_path, folder, label) for folder in ["train", "val", "test"]]
+        [os.makedirs(path, exist_ok=True) for path in dst_paths]
+
+        # Get all video path in source folder
+        video_paths = [os.path.join(self.root, video) for video in videos]
+
+        num_videos = len(video_paths)
+
+        random.shuffle(video_paths)
+
+        # Split into train, val, test chunk
+        split_sizes = [round(num_videos * size) for size in self.split_size]
+        splited_video_paths = [
+            video_paths[:split_sizes[0]], 
+            video_paths[split_sizes[0]:split_sizes[0]+split_sizes[1]], 
+            video_paths[split_sizes[0]+split_sizes[1]:]
+        ]
+
+        # Copy to new destination
+        for video_paths, split_path in zip(splited_video_paths, dst_paths):
+            for video_path in video_paths:
+                dst_path = os.path.join(split_path, video_path.split("/")[-1])
+                if not os.path.exists(dst_path):
+                    shutil.copyfile(video_path, dst_path)
+
+
+    def prepare_data(self):
+        """
+        Preprocess data
+        """
+        if not os.path.exists(self.root):
+            raise FileNotFoundError(self.root)
+
+        if not os.path.exists(self.x_path):
+            print("[bold]Processing data:[/] Splitting data... ", end="\r")
+            data = {label: [] for label in self.classes}
+            for video in os.listdir(self.root):
+                key = video.split("_")[0]
+                data[self.labels[key]].append(video)
+
+            with Pool(self.workers) as pool:
+                pool.map(self._split_data, data.items())
+
+            print("[bold]Processing data:[/] Generating data...", end="\r")
+            video_paths = list(str(video) for video in Path(self.temp_path).rglob(f'*.avi'))
+            with Pool(self.workers) as pool:
+                pool.map(self._frame_generate, video_paths)
+
+            shutil.rmtree(self.temp_path)
+            print("[bold]Processing data:[/] Done              ")
+
+        else:
+            print("[bold]Processing data:[/] Existed")
