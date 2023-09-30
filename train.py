@@ -1,5 +1,5 @@
 from modules.callback import callbacks_list
-from modules.data import UCF11DataModule
+from modules.data import UCF11DataModule, UTD_MHADDataModule
 from modules.model import LitModel
 from models import VGG11, ViT_B_16
 
@@ -25,15 +25,15 @@ NUM_WOKER = int(os.cpu_count()*0.6) if torch.cuda.is_available() else 0
 
 def main(args):
     # Define dataset
-    dataset = UCF11DataModule(
-        data_path = "data/UCF11", 
-        sampling_value = 3,
+    dataset = UTD_MHADDataModule(
+        data_path = "data/UTD-MHAD", 
+        sampling_value = 4,
         batch_size = args.batch,
         num_workers = NUM_WOKER
     )
 
     # Define model
-    model = ViT_B_16(num_classes=11, pretrained=True, freeze=True)
+    model = VGG11(num_classes=27, hidden_features=512, pretrained=True, freeze=True)
     lit_model = LitModel(
         model = model,
         criterion = nn.CrossEntropyLoss(),
