@@ -8,7 +8,7 @@ import os
 from modules.transform import DataAugmentation
 from modules.processing import VideoProcessing
 
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 from torchvision.datasets import ImageFolder
 
 from lightning.pytorch import LightningDataModule
@@ -99,9 +99,11 @@ class CustomDataModule(LightningDataModule):
             self.train_data = ImageFolder(os.path.join(self.x_path, "train"), transform=self.transform)
             self.val_data = ImageFolder(os.path.join(self.x_path, "val"), transform=self.transform)
             self.test_data = ImageFolder(os.path.join(self.x_path, "test"), transform=self.transform)
+            
+            self.dataset = ConcatDataset([self.train_data, self.val_data, self.test_data])
 
         if stage == "fit":
-            print(f"[bold]Dataset size:[/] {sum([len(self.train_data), len(self.val_data), len(self.test_data)]):,}")
+            print(f"[bold]Dataset size:[/] {len(self.dataset):,}")
             print(f"[bold]Number of classes:[/] {len(self.classes):,}")
 
 
