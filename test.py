@@ -32,11 +32,15 @@ VP = VideoProcessing(
     size = (750, 750)
 )
 
-DATA_PATH = "data/UTD-MHAD"
+DATA_PATH = "data/UCF50"
 
-MODEL = VGG11(num_classes=27, hidden_features=512)
+SHOW_VIDEO = True
+NUM_VIDEO = 3   # number of random video
+WAITKEY = 90    # millisecond before next frame
 
-CHECKPOINT = "lightning_logs/VGG11_512_UTD/checkpoints/last.ckpt"
+MODEL = ViT_B_16(num_classes=50)
+
+CHECKPOINT = "lightning_logs/ViT_UCF50/checkpoints/last.ckpt"
 
 
 
@@ -52,41 +56,45 @@ def main(args):
                 video_paths.append(video_path)
     
     # Define classes
-    classes = sorted(os.listdir("data/UTD-MHAD_x/test"))
+    classes = sorted(os.listdir(DATA_PATH))
 
     # Define model
     lit_model = LitModel(MODEL, checkpoint=CHECKPOINT).to(DEVICE)
 
     # Iterate random video
-    for i, path in enumerate(random.sample(video_paths, 1)):
-        results = []
+    for i, path in enumerate(random.sample(video_paths, NUM_VIDEO)):
+        total = []
         for frame in VP(path):
             with torch.inference_mode():
                 X = TRANSFORM(Image.fromarray(frame)).unsqueeze(0).to(DEVICE)
                 outputs = lit_model(X)
                 _, pred = torch.max(outputs, 1)
 
-            results.append(classes[pred.item()])
+            result = classes[pred.item()]
+
+            total.append(result)
 
             frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
-            # cv2.putText(
-            #     frame, 
-            #     classes[unique_items[most_frequent_index]], 
-            #     (10, frame.shape[0] - 30), cv2.FONT_HERSHEY_SIMPLEX, 
-            #     2, (255, 0, 0), 5
-            # )
+            cv2.putText(
+                frame, result, 
+                (10, frame.shape[0] - 30), cv2.FONT_HERSHEY_SIMPLEX, 
+                2, (255, 0, 0), 5
+            )
 
-            cv2.imshow("a", frame)
+            cv2.imshow(path, frame) if SHOW_VIDEO else None
 
-            if cv2.waitKey(100) == ord('q'):
+            key = cv2.waitKey(WAITKEY) & 0xFF
+            if key == ord('c'):
+                break
+            if key == ord('q'):
                 exit()
 
-        element_counts = Counter(results)
+        sorted_list = sorted(total, key=lambda x: (-Counter(total)[x], x), reverse=True)
 
-        sorted_list = sorted(results, key=lambda x: (-element_counts[x], x), reverse=True)
+        print("\n[bold]Path:[/]", path, Counter(sorted_list))
 
-        print(Counter(sorted_list))
+        cv2.destroyAllWindows()
 
 
 
