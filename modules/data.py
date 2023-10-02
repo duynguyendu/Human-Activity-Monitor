@@ -8,7 +8,7 @@ import os
 from modules.transform import DataAugmentation
 from modules.processing import VideoProcessing
 
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 from torchvision.datasets import ImageFolder
 
 from lightning.pytorch import LightningDataModule
@@ -80,7 +80,7 @@ class CustomDataModule(LightningDataModule):
                 pool.map(self._split_data, class_folders)
 
             print("[bold]Processing data:[/] Generating data...", end="\r")
-            video_paths = list(str(video) for video in Path(self.temp_path).rglob(f'*.mpg'))
+            video_paths = list(str(video) for video in Path(self.temp_path).rglob(self.format))
             with Pool(self.workers) as pool:
                 pool.map(self._frame_generate, video_paths)
 
@@ -99,9 +99,11 @@ class CustomDataModule(LightningDataModule):
             self.train_data = ImageFolder(os.path.join(self.x_path, "train"), transform=self.transform)
             self.val_data = ImageFolder(os.path.join(self.x_path, "val"), transform=self.transform)
             self.test_data = ImageFolder(os.path.join(self.x_path, "test"), transform=self.transform)
+            
+            self.dataset = ConcatDataset([self.train_data, self.val_data, self.test_data])
 
         if stage == "fit":
-            print(f"[bold]Dataset size:[/] {sum([len(self.train_data), len(self.val_data), len(self.test_data)]):,}")
+            print(f"[bold]Dataset size:[/] {len(self.dataset):,}")
             print(f"[bold]Number of classes:[/] {len(self.classes):,}")
 
 
@@ -133,6 +135,7 @@ class UCF11DataModule(CustomDataModule):
         super().__init__(
             data_path, batch_size, train_val_test_split, sampling_value, num_frames, image_size, num_workers, pin_memory
         )
+        self.format = "*.mpg"
 
 
     def _split_data(self, class_folder: str):
@@ -142,7 +145,55 @@ class UCF11DataModule(CustomDataModule):
 
         # Get all video path in source folder
         class_path = os.path.join(self.root, class_folder)
-        video_paths = list(str(video) for video in Path(class_path).rglob(f'*.mpg'))
+        video_paths = list(str(video) for video in Path(class_path).rglob(self.format))
+
+        num_videos = len(video_paths)
+
+        random.shuffle(video_paths)
+
+        # Split into train, val, test chunk
+        split_sizes = [round(num_videos * size) for size in self.split_size]
+        splited_video_paths = [
+            video_paths[:split_sizes[0]], 
+            video_paths[split_sizes[0]:split_sizes[0]+split_sizes[1]], 
+            video_paths[split_sizes[0]+split_sizes[1]:]
+        ]
+
+        # Copy to new destination
+        for video_paths, split_path in zip(splited_video_paths, dst_paths):
+            for video_path in video_paths:
+                dst_path = os.path.join(split_path, video_path.split("/")[-1])
+                if not os.path.exists(dst_path):
+                    shutil.copyfile(video_path, dst_path)
+
+
+
+class UCF50DataModule(CustomDataModule):
+    def __init__(
+            self, 
+            data_path: str, 
+            batch_size: int = 32,
+            train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
+            sampling_value: int = 0,
+            num_frames: int = 0,
+            image_size: Tuple[int, int] = (224, 224),
+            num_workers: int = 0,
+            pin_memory: bool = True,
+        ):
+        super().__init__(
+            data_path, batch_size, train_val_test_split, sampling_value, num_frames, image_size, num_workers, pin_memory
+        )
+        self.format = "*.avi"
+
+
+    def _split_data(self, class_folder: str):
+        # Create new path train, val, test folder
+        dst_paths = [os.path.join(self.temp_path, folder, class_folder) for folder in ["train", "val", "test"]]
+        [os.makedirs(path, exist_ok=True) for path in dst_paths]
+
+        # Get all video path in source folder
+        class_path = os.path.join(self.root, class_folder)
+        video_paths = list(str(video) for video in Path(class_path).rglob(self.format))
 
         num_videos = len(video_paths)
 
@@ -180,6 +231,7 @@ class UTD_MHADDataModule(CustomDataModule):
         super().__init__(
             data_path, batch_size, train_val_test_split, sampling_value, num_frames, image_size, num_workers, pin_memory
         )
+        self.format = "*.avi"
         self.labels = {
             "a1": "Swipe left", 
             "a2": "Swipe right", 
@@ -264,7 +316,7 @@ class UTD_MHADDataModule(CustomDataModule):
                 pool.map(self._split_data, data.items())
 
             print("[bold]Processing data:[/] Generating data...", end="\r")
-            video_paths = list(str(video) for video in Path(self.temp_path).rglob(f'*.avi'))
+            video_paths = list(str(video) for video in Path(self.temp_path).rglob(self.format))
             with Pool(self.workers) as pool:
                 pool.map(self._frame_generate, video_paths)
 
