@@ -15,8 +15,11 @@ class VideoProcessing():
     - sampling: 
         Choose 1 frame every n frames
 
-    - balancing: 
-        Decide max or min frame of a video
+    - truncating: 
+        Equally trim both head and tail if video length > max_frame
+
+    - padding: 
+        Pad black frame to end of video if video length < min_frame
 
     - resize: 
         Change size of a video
