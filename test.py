@@ -27,8 +27,9 @@ NUM_WOKER = int(os.cpu_count()*0.8) if torch.cuda.is_available() else 0
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 TRANSFORM = DataAugmentation().DEFAULT
 VP = VideoProcessing(
-    sampling_value = 4, 
-    num_frames = 0, 
+    sampling_value = 4,
+    max_frames = 0,
+    min_frames = 0,
     size = (750, 750)
 )
 
