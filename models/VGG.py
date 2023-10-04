@@ -8,6 +8,14 @@ from torchvision.models.vgg import (
 )
 
 
+__all__ = [
+    "VGG11",
+    "VGG13",
+    "VGG16",
+    "VGG19"
+]
+
+
 
 class VGGModule(nn.Module):
     def __init__(

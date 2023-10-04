@@ -28,11 +28,13 @@ class VideoProcessing():
     def __init__(
             self, 
             sampling_value: int, 
-            num_frames: int, 
+            max_frames: int, 
+            min_frames: int, 
             size: Tuple[int, int]
         ) -> None:
         self.sampling_value = sampling_value
-        self.num_frames = num_frames
+        self.max_frames = max_frames
+        self.min_frames = min_frames
         self.size = size
 
 
@@ -66,23 +68,27 @@ class VideoProcessing():
         return video[::value] if value else video
 
 
-    def balancing(self, video: np.ndarray, value: int) -> np.ndarray:
+    def truncating(self, video: np.ndarray, max_frame: int) -> np.ndarray:
         """
-        Decide number of frame in a video
-        - Cut both head and last if > max_frame
-        - Append black frame to end if < max_frame
+        Cut both head and last if video length > max_frame
+        Output is the middle of the source video
         """
-        if value != 0:
-            video_lenth = len(video)
-            if video_lenth > value:
-                middle_frame = video_lenth // 2
-                m = value // 2
-                r = value % 2
-                video = video[middle_frame - m : middle_frame + m + r]
-            elif video_lenth < value:
-                zeros_array = np.zeros((value, *video.shape[1:]), dtype=np.uint8)
-                zeros_array[:video_lenth, ...] = video
-                video = zeros_array
+        if max_frame > 0:
+            middle_frame = len(video) // 2
+            m = max_frame // 2
+            r = max_frame % 2
+            video = video[middle_frame - m : middle_frame + m + r]
+        return video
+
+
+    def padding(self, video: np.ndarray, min_frame: int) -> np.ndarray:
+        """
+        Pad black frame to end of video if video length < min_frame
+        """
+        if min_frame > 0:
+            zeros_array = np.zeros((min_frame, *video.shape[1:]), dtype=np.uint8)
+            zeros_array[:len(video), ...] = video
+            video = zeros_array
         return video
 
 
@@ -95,10 +101,11 @@ class VideoProcessing():
 
     def auto(self, path: np.ndarray) -> List[np.ndarray]:
         """
-        Auto apply: Load -> Sampling -> Balancing -> Resize
+        Auto apply: Load -> Sampling -> Truncating -> Padding -> Resize
         """
-        out = self.load(path)
-        out = self.sampling(out, self.sampling_value)
-        out = self.balancing(out, self.num_frames)
-        out = self.resize(out, self.size)
-        return out
+        video = self.load(path)
+        video = self.sampling(video, self.sampling_value)
+        video = self.truncating(video, self.max_frames)
+        video = self.padding(video, self.min_frames)
+        video = self.resize(video, self.size)
+        return video
