@@ -15,6 +15,7 @@ from lightning.pytorch import LightningDataModule
 
 from rich import print
 from PIL import Image
+import yaml
 
 
 __all__ = [
@@ -44,6 +45,7 @@ class CustomDataModule(LightningDataModule):
         self.root = data_path
         self.x_path = data_path + "_x"
         self.temp_path = data_path + "_tmp"
+        self.config_path = os.path.join(self.x_path, "config.yaml")
         self.extensions = ['.mp4', '.avi', '.mkv', '.mov', '.flv', '.mpg']
         self.split_size = train_val_test_split
         self.workers = num_workers
@@ -84,7 +86,7 @@ class CustomDataModule(LightningDataModule):
 
         # Get all video path in source folder
         class_path = os.path.join(self.root, class_folder)
-        video_paths = [str(video) for ext in self.extensions for video in Path(self.temp_path).rglob("*" + ext)]
+        video_paths = [str(video) for ext in self.extensions for video in Path(class_path).rglob("*" + ext)]
 
         num_videos = len(video_paths)
 
@@ -106,6 +108,31 @@ class CustomDataModule(LightningDataModule):
                     shutil.copyfile(video_path, dst_path)
 
 
+    def _save_config(self):
+        with open(self.config_path, "w") as config:
+            config.write(
+                """
+                # `_x` is the folder containing processed files.
+
+                # Parameters:
+                # -----------
+                # - image_size: Size of the image.
+                # - max_frame: Equally trim both head and tail if video length > max_frame.
+                # - min_frame: Pad black frame to end of video if video length < min_frame.
+                # - sampling: Choose 1 frame every n frames.
+                # - train_val_test_split: Train, val, test split size.
+
+                """
+            )
+            yaml.dump({
+                "train_val_test_split": self.split_size,
+                "sampling_value": self.processer.sampling_value,
+                "max_frames": self.processer.max_frames,
+                "min_frames": self.processer.min_frames,
+                "image_size": self.transform.image_size,
+            }, config, default_flow_style=False)
+
+
     def prepare_data(self):
         """
         Preprocess data
@@ -124,6 +151,7 @@ class CustomDataModule(LightningDataModule):
             with Pool(self.workers) as pool:
                 pool.map(self._frame_generate, video_paths)
 
+            self._save_config()
             shutil.rmtree(self.temp_path) if not self.keep_temp else None
             print("[bold]Processing data:[/] Done              ")
 
@@ -180,6 +208,25 @@ class UCF11DataModule(CustomDataModule):
 
 
 class UCF50DataModule(CustomDataModule):
+    def __init__(
+            self, 
+            data_path: str, 
+            batch_size: int = 32,
+            train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
+            keep_temp: bool = False,
+            sampling_value: int = 0,
+            max_frames: int = 0,
+            min_frames: int = 0,
+            image_size: Tuple[int, int] = (224, 224),
+            num_workers: int = 0,
+            pin_memory: bool = True,
+        ):
+        self.save_hyperparameters()
+        super().__init__(**self.hparams)
+
+
+
+class UCF101DataModule(CustomDataModule):
     def __init__(
             self, 
             data_path: str, 
