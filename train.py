@@ -6,6 +6,7 @@ from modules.model import LitModel
 from modules.data import *
 from models import *
 
+from torch.optim.lr_scheduler import CosineAnnealingLR
 import torch.optim as optim
 import torch.nn as nn
 import torch
@@ -26,27 +27,33 @@ NUM_WOKER = int(os.cpu_count()*0.8) if torch.cuda.is_available() else 0
 
 def main(args):
     # Define dataset
-    DATASET = CustomDataModule(
-        data_path = "data/UTD-MHAD",
-        sampling_value = 2,
+    dataset = CustomDataModule(
+        data_path = "data/UCF-101",
+        sampling_value = 4,
         # max_frames = 32,
         batch_size = args.batch,
         num_workers = NUM_WOKER
     )
 
     # Define model
-    MODEL = ViT_B_16(
-        num_classes = len(DATASET.classes),
+    model = ViT_B_32(
+        num_classes = len(dataset.classes),
         # hidden_features = 256,
         pretrained = True,
         freeze = True
     )
 
+    # Loss, optimizer, scheduler
+    loss = nn.CrossEntropyLoss()
+    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
+    scheduler = CosineAnnealingLR(optimizer, T_max=args.epoch, eta_min=1e-6)
+
     # Lightning model
     lit_model = LitModel(
-        model = MODEL,
-        criterion = nn.CrossEntropyLoss(),
-        optimizer = optim.AdamW(MODEL.parameters(), lr=args.learning_rate),
+        model = model, 
+        criterion = loss, 
+        optimizer = optimizer, 
+        scheduler = scheduler, 
         checkpoint = args.checkpoint
     )
 
@@ -58,10 +65,10 @@ def main(args):
     )
 
     # Training
-    trainer.fit(lit_model, DATASET)
+    trainer.fit(lit_model, dataset)
 
     # Testing
-    trainer.test(lit_model, DATASET)
+    trainer.test(lit_model, dataset)
 
 
 
