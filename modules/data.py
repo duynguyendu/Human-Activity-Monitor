@@ -17,6 +17,13 @@ from rich import print
 from PIL import Image
 
 
+__all__ = [
+    "CustomDataModule",
+    "UCF11DataModule",
+    "UCF50DataModule",
+    "UTD_MHADDataModule"
+]
+
 
 
 class CustomDataModule(LightningDataModule):
@@ -25,8 +32,10 @@ class CustomDataModule(LightningDataModule):
             data_path: str, 
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
+            keep_temp: bool = False,
             sampling_value: int = 0,
-            num_frames: int = 0,
+            max_frames: int = 0,
+            min_frames: int = 0,
             image_size: Tuple[int, int] = (224, 224),
             num_workers: int = 0,
             pin_memory: bool = True,
@@ -35,9 +44,11 @@ class CustomDataModule(LightningDataModule):
         self.root = data_path
         self.x_path = data_path + "_x"
         self.temp_path = data_path + "_tmp"
+        self.extensions = ['.mp4', '.avi', '.mkv', '.mov', '.flv', '.mpg']
         self.split_size = train_val_test_split
         self.workers = num_workers
-        self.processer = VideoProcessing(sampling_value, num_frames, image_size)
+        self.keep_temp = keep_temp
+        self.processer = VideoProcessing(sampling_value, max_frames, min_frames, image_size)
         self.transform = DataAugmentation(image_size)
         self.loader_config = {
             "batch_size": batch_size,
@@ -66,6 +77,35 @@ class CustomDataModule(LightningDataModule):
                 img.save(save_path)
 
 
+    def _split_data(self, class_folder: str):
+        # Create new path train, val, test folder
+        dst_paths = [os.path.join(self.temp_path, folder, class_folder) for folder in ["train", "val", "test"]]
+        [os.makedirs(path, exist_ok=True) for path in dst_paths]
+
+        # Get all video path in source folder
+        class_path = os.path.join(self.root, class_folder)
+        video_paths = [str(video) for ext in self.extensions for video in Path(self.temp_path).rglob("*" + ext)]
+
+        num_videos = len(video_paths)
+
+        random.shuffle(video_paths)
+
+        # Split into train, val, test chunk
+        split_sizes = [round(num_videos * size) for size in self.split_size]
+        splited_video_paths = [
+            video_paths[:split_sizes[0]], 
+            video_paths[split_sizes[0]:split_sizes[0]+split_sizes[1]], 
+            video_paths[split_sizes[0]+split_sizes[1]:]
+        ]
+
+        # Copy to new destination
+        for video_paths, split_path in zip(splited_video_paths, dst_paths):
+            for video_path in video_paths:
+                dst_path = os.path.join(split_path, video_path.split("/")[-1])
+                if not os.path.exists(dst_path):
+                    shutil.copyfile(video_path, dst_path)
+
+
     def prepare_data(self):
         """
         Preprocess data
@@ -80,11 +120,11 @@ class CustomDataModule(LightningDataModule):
                 pool.map(self._split_data, class_folders)
 
             print("[bold]Processing data:[/] Generating data...", end="\r")
-            video_paths = list(str(video) for video in Path(self.temp_path).rglob(self.format))
+            video_paths = [str(video) for ext in self.extensions for video in Path(self.temp_path).rglob("*" + ext)]
             with Pool(self.workers) as pool:
                 pool.map(self._frame_generate, video_paths)
 
-            shutil.rmtree(self.temp_path)
+            shutil.rmtree(self.temp_path) if not self.keep_temp else None
             print("[bold]Processing data:[/] Done              ")
 
         else:
@@ -126,45 +166,16 @@ class UCF11DataModule(CustomDataModule):
             data_path: str, 
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
+            keep_temp: bool = False,
             sampling_value: int = 0,
-            num_frames: int = 0,
+            max_frames: int = 0,
+            min_frames: int = 0,
             image_size: Tuple[int, int] = (224, 224),
             num_workers: int = 0,
             pin_memory: bool = True,
         ):
-        super().__init__(
-            data_path, batch_size, train_val_test_split, sampling_value, num_frames, image_size, num_workers, pin_memory
-        )
-        self.format = "*.mpg"
-
-
-    def _split_data(self, class_folder: str):
-        # Create new path train, val, test folder
-        dst_paths = [os.path.join(self.temp_path, folder, class_folder) for folder in ["train", "val", "test"]]
-        [os.makedirs(path, exist_ok=True) for path in dst_paths]
-
-        # Get all video path in source folder
-        class_path = os.path.join(self.root, class_folder)
-        video_paths = list(str(video) for video in Path(class_path).rglob(self.format))
-
-        num_videos = len(video_paths)
-
-        random.shuffle(video_paths)
-
-        # Split into train, val, test chunk
-        split_sizes = [round(num_videos * size) for size in self.split_size]
-        splited_video_paths = [
-            video_paths[:split_sizes[0]], 
-            video_paths[split_sizes[0]:split_sizes[0]+split_sizes[1]], 
-            video_paths[split_sizes[0]+split_sizes[1]:]
-        ]
-
-        # Copy to new destination
-        for video_paths, split_path in zip(splited_video_paths, dst_paths):
-            for video_path in video_paths:
-                dst_path = os.path.join(split_path, video_path.split("/")[-1])
-                if not os.path.exists(dst_path):
-                    shutil.copyfile(video_path, dst_path)
+        self.save_hyperparameters()
+        super().__init__(**self.hparams)
 
 
 
@@ -174,98 +185,74 @@ class UCF50DataModule(CustomDataModule):
             data_path: str, 
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
+            keep_temp: bool = False,
             sampling_value: int = 0,
-            num_frames: int = 0,
+            max_frames: int = 0,
+            min_frames: int = 0,
             image_size: Tuple[int, int] = (224, 224),
             num_workers: int = 0,
             pin_memory: bool = True,
         ):
-        super().__init__(
-            data_path, batch_size, train_val_test_split, sampling_value, num_frames, image_size, num_workers, pin_memory
-        )
-        self.format = "*.avi"
-
-
-    def _split_data(self, class_folder: str):
-        # Create new path train, val, test folder
-        dst_paths = [os.path.join(self.temp_path, folder, class_folder) for folder in ["train", "val", "test"]]
-        [os.makedirs(path, exist_ok=True) for path in dst_paths]
-
-        # Get all video path in source folder
-        class_path = os.path.join(self.root, class_folder)
-        video_paths = list(str(video) for video in Path(class_path).rglob(self.format))
-
-        num_videos = len(video_paths)
-
-        random.shuffle(video_paths)
-
-        # Split into train, val, test chunk
-        split_sizes = [round(num_videos * size) for size in self.split_size]
-        splited_video_paths = [
-            video_paths[:split_sizes[0]], 
-            video_paths[split_sizes[0]:split_sizes[0]+split_sizes[1]], 
-            video_paths[split_sizes[0]+split_sizes[1]:]
-        ]
-
-        # Copy to new destination
-        for video_paths, split_path in zip(splited_video_paths, dst_paths):
-            for video_path in video_paths:
-                dst_path = os.path.join(split_path, video_path.split("/")[-1])
-                if not os.path.exists(dst_path):
-                    shutil.copyfile(video_path, dst_path)
+        self.save_hyperparameters()
+        super().__init__(**self.hparams)
 
 
 
-class UTD_MHADDataModule(CustomDataModule):
+class HMDB51DataModule(CustomDataModule):
     def __init__(
             self, 
             data_path: str, 
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
+            keep_temp: bool = False,
             sampling_value: int = 0,
-            num_frames: int = 0,
+            max_frames: int = 0,
+            min_frames: int = 0,
             image_size: Tuple[int, int] = (224, 224),
             num_workers: int = 0,
             pin_memory: bool = True,
         ):
-        super().__init__(
-            data_path, batch_size, train_val_test_split, sampling_value, num_frames, image_size, num_workers, pin_memory
+        self.save_hyperparameters()
+        super().__init__(**self.hparams)
+
+
+
+class UTD_MHADDataModule(CustomDataModule):
+    LABELS = {
+        f"a{i}": action
+        for i, action in enumerate(
+            [
+                "Swipe left", "Swipe right", "Wave", "Clap", "Throw",
+                "Arm cross", "Basketball shoot", "Draw X", "Draw circle (forward)",
+                "Draw circle (backward)", "Draw triangle", "Bowling", "Boxing",
+                "Baseball swing", "Tennis swing", "Arm curl", "Tennis serve", "Push",
+                "Knock", "Catch", "Pickup and throw", "Jog", "Walk", "Sit to stand",
+                "Stand to sit", "Lunge", "Squat"
+            ],
+            start=1
         )
-        self.format = "*.avi"
-        self.labels = {
-            "a1": "Swipe left", 
-            "a2": "Swipe right", 
-            "a3": "Wave", 
-            "a4": "Clap", 
-            "a5": "Throw", 
-            "a6": "Arm cross", 
-            "a7": "Basketball shoot",
-            "a8": "Draw X",
-            "a9": "Draw circle (forward)",
-            "a10": "Draw circle (backward)",
-            "a11": "Draw triangle",
-            "a12": "Bowling",
-            "a13": "Boxing",
-            "a14": "Baseball swing",
-            "a15": "Tennis swing",
-            "a16": "Arm curl",
-            "a17": "Tennis serve",
-            "a18": "Push",
-            "a19": "Knock",
-            "a20": "Catch",
-            "a21": "Pickup and throw",
-            "a22": "Jog",
-            "a23": "Walk",
-            "a24": "Sit to stand",
-            "a25": "Stand to sit",
-            "a26": "Lunge",
-            "a27": "Squat"
-        }
+    }
+
+    def __init__(
+            self, 
+            data_path: str, 
+            batch_size: int = 32,
+            train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
+            keep_temp: bool = False,
+            sampling_value: int = 0,
+            max_frames: int = 0,
+            min_frames: int = 0,
+            image_size: Tuple[int, int] = (224, 224),
+            num_workers: int = 0,
+            pin_memory: bool = True,
+        ):
+        self.save_hyperparameters()
+        super().__init__(**self.hparams)
 
 
     @property
     def classes(self) -> List[str]:
-        return sorted(self.labels.values())
+        return sorted(self.LABELS.values())
 
 
     def _split_data(self, data: Tuple[str, List[str]]):
@@ -310,13 +297,13 @@ class UTD_MHADDataModule(CustomDataModule):
             data = {label: [] for label in self.classes}
             for video in os.listdir(self.root):
                 key = video.split("_")[0]
-                data[self.labels[key]].append(video)
+                data[self.LABELS[key]].append(video)
 
             with Pool(self.workers) as pool:
                 pool.map(self._split_data, data.items())
 
             print("[bold]Processing data:[/] Generating data...", end="\r")
-            video_paths = list(str(video) for video in Path(self.temp_path).rglob(self.format))
+            video_paths = [str(video) for ext in self.extensions for video in Path(self.temp_path).rglob("*" + ext)]
             with Pool(self.workers) as pool:
                 pool.map(self._frame_generate, video_paths)
 

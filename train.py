@@ -1,18 +1,18 @@
-from modules.callback import callbacks_list
-from modules.data import UCF11DataModule, UCF50DataModule, UTD_MHADDataModule
-from modules.model import LitModel
-from models import VGG11, ViT_B_16
-
 from argparse import ArgumentParser
 import os
 
-from rich import print, traceback
-traceback.install()
+from modules.callback import callbacks_list
+from modules.model import LitModel
+from modules.data import *
+from models import *
 
-from lightning.pytorch import Trainer, seed_everything
 import torch.optim as optim
 import torch.nn as nn
 import torch
+
+from lightning.pytorch import seed_everything, Trainer
+from rich import traceback
+traceback.install()
 
 
 
@@ -23,36 +23,45 @@ seed_everything(seed=42, workers=True)
 NUM_WOKER = int(os.cpu_count()*0.8) if torch.cuda.is_available() else 0
 
 
+
 def main(args):
     # Define dataset
-    dataset = UCF50DataModule(
-        data_path = "data/UCF50", 
-        sampling_value = 4,
+    DATASET = CustomDataModule(
+        data_path = "data/UTD-MHAD",
+        sampling_value = 2,
+        # max_frames = 32,
         batch_size = args.batch,
         num_workers = NUM_WOKER
     )
 
     # Define model
-    model = ViT_B_16(num_classes=11, pretrained=True, freeze=True)
-    lit_model = LitModel(
-        model = model,
-        criterion = nn.CrossEntropyLoss(),
-        optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate),
-        checkpoint = None
+    MODEL = ViT_B_16(
+        num_classes = len(DATASET.classes),
+        # hidden_features = 256,
+        pretrained = True,
+        freeze = True
     )
 
-    # Define trainer
+    # Lightning model
+    lit_model = LitModel(
+        model = MODEL,
+        criterion = nn.CrossEntropyLoss(),
+        optimizer = optim.AdamW(MODEL.parameters(), lr=args.learning_rate),
+        checkpoint = args.checkpoint
+    )
+
+    # Lightning trainer
     trainer = Trainer(
-        max_epochs = args.epoch, 
+        max_epochs = args.epoch,
         precision = "16-mixed",
         callbacks = callbacks_list
     )
 
     # Training
-    trainer.fit(lit_model, dataset)
+    trainer.fit(lit_model, DATASET)
 
     # Testing
-    trainer.test(lit_model, dataset)
+    trainer.test(lit_model, DATASET)
 
 
 

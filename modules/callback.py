@@ -29,6 +29,6 @@ callbacks_list = [
     cb.EarlyStopping(
         monitor='val/loss',
         min_delta=0.0001,
-        patience=3
+        patience=5
     )
 ]

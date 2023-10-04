@@ -18,6 +18,7 @@ from rich import traceback, print
 traceback.install()
 
 
+
 # Set seed
 # seed_everything(seed=42, workers=True)
 
@@ -25,12 +26,12 @@ traceback.install()
 NUM_WOKER = int(os.cpu_count()*0.8) if torch.cuda.is_available() else 0
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 TRANSFORM = DataAugmentation().DEFAULT
-
 VP = VideoProcessing(
     sampling_value = 4, 
     num_frames = 0, 
     size = (750, 750)
 )
+
 
 DATA_PATH = "data/UCF50"
 
