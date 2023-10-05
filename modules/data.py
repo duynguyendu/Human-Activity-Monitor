@@ -111,18 +111,19 @@ class CustomDataModule(LightningDataModule):
     def _save_config(self):
         with open(self.config_path, "w") as config:
             config.write(
-                """
-                # `_x` is the folder containing processed files.
-
-                # Parameters:
-                # -----------
-                # - image_size: Size of the image.
-                # - max_frame: Equally trim both head and tail if video length > max_frame.
-                # - min_frame: Pad black frame to end of video if video length < min_frame.
-                # - sampling: Choose 1 frame every n frames.
-                # - train_val_test_split: Train, val, test split size.
-
-                """
+                "# `_x` is the folder containing processed files.\n"
+                "\n"
+                "# Parameters:\n"
+                "# -----------\n"
+                "# - image_size: Size of the image.\n"
+                "# - max_frame: Equally trim both head and tail if video length > max_frame.\n"
+                "# - min_frame: Pad black frame to end of video if video length < min_frame.\n"
+                "# - sampling: Choose 1 frame every n frames.\n"
+                "# - train_val_test_split: Train, val, test split size.\n"
+                "\n"
+                f"# Number of images: {len([image for image in Path(self.x_path).rglob('*.jpg')])}\n"
+                f"# Number of classes: {len(self.classes)}\n"
+                "\n"
             )
             yaml.dump({
                 "train_val_test_split": self.split_size,
@@ -171,7 +172,7 @@ class CustomDataModule(LightningDataModule):
             self.dataset = ConcatDataset([self.train_data, self.val_data, self.test_data])
 
         if stage == "fit":
-            print(f"[bold]Dataset size:[/] {len(self.dataset):,}")
+            print(f"[bold]Number of data:[/] {len(self.dataset):,}")
             print(f"[bold]Number of classes:[/] {len(self.classes):,}")
 
 
