@@ -6,13 +6,13 @@ import os
 from modules.transform import DataAugmentation
 from modules.processing import VideoProcessing
 from modules.model import LitModel
-from models import ViT_B_16, VGG11
+from modules.data import *
+from models import *
 
 from lightning.pytorch import seed_everything
 import torch
 
 import cv2
-import numpy as np
 from PIL import Image
 from rich import traceback, print
 traceback.install()
@@ -27,21 +27,23 @@ NUM_WOKER = int(os.cpu_count()*0.8) if torch.cuda.is_available() else 0
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 TRANSFORM = DataAugmentation().DEFAULT
 VP = VideoProcessing(
-    sampling_value = 4, 
-    num_frames = 0, 
+    sampling_value = 2,
+    max_frames = 0,
+    min_frames = 0,
     size = (750, 750)
 )
 
 
-DATA_PATH = "data/UCF50"
+DATA_PATH = "data/UCF-101"
+CLASESS = sorted(os.listdir(DATA_PATH))
 
 SHOW_VIDEO = True
 NUM_VIDEO = 3   # number of random video
-WAITKEY = 90    # millisecond before next frame
+WAITKEY = 45    # millisecond before next frame
 
-MODEL = ViT_B_16(num_classes=50)
+MODEL = ViT_B_32(num_classes=len(CLASESS))
 
-CHECKPOINT = "lightning_logs/ViT_UCF50/checkpoints/last.ckpt"
+CHECKPOINT = "lightning_logs/ViT_B_32_UCF101/checkpoints/epoch=14-step=23415.ckpt"
 
 
 
@@ -55,9 +57,6 @@ def main(args):
             if any(file.lower().endswith(ext) for ext in extensions):
                 video_path = os.path.join(root, file)
                 video_paths.append(video_path)
-    
-    # Define classes
-    classes = sorted(os.listdir(DATA_PATH))
 
     # Define model
     lit_model = LitModel(MODEL, checkpoint=CHECKPOINT).to(DEVICE)
@@ -71,7 +70,7 @@ def main(args):
                 outputs = lit_model(X)
                 _, pred = torch.max(outputs, 1)
 
-            result = classes[pred.item()]
+            result = CLASESS[pred.item()]
 
             total.append(result)
 
@@ -93,7 +92,8 @@ def main(args):
 
         sorted_list = sorted(total, key=lambda x: (-Counter(total)[x], x), reverse=True)
 
-        print("\n[bold]Path:[/]", path, Counter(sorted_list))
+        print("\n[bold][green]Path:[/][/]", f"[white]{path}[/]")
+        print(Counter(sorted_list))
 
         cv2.destroyAllWindows()
 

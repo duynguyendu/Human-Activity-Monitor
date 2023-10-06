@@ -18,12 +18,14 @@ class LitModel(LightningModule):
             model: nn.Module,
             criterion: nn.Module = None,
             optimizer: optim.Optimizer = None,
+            scheduler: optim.Optimizer = None,
             checkpoint: str = None
         ):
         super().__init__()
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
+        self.scheduler = scheduler
         if checkpoint:
             self.load(checkpoint)
 
@@ -33,7 +35,12 @@ class LitModel(LightningModule):
 
 
     def configure_optimizers(self):
-        return self.optimizer
+        if not self.scheduler:
+            return self.optimizer
+        if isinstance(self.optimizer, list):
+            return self.optimizer, self.scheduler if isinstance(self.scheduler, list) else [self.scheduler]
+        else:
+            return [self.optimizer], [self.scheduler]
 
 
     def _log(self, stage: str, loss, y_hat, y):
