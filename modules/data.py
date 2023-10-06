@@ -172,6 +172,7 @@ class CustomDataModule(LightningDataModule):
             self.dataset = ConcatDataset([self.train_data, self.val_data, self.test_data])
 
         if stage == "fit":
+            print(f"[bold]Data path:[/] [green]{self.root}[/]")
             print(f"[bold]Number of data:[/] {len(self.dataset):,}")
             print(f"[bold]Number of classes:[/] {len(self.classes):,}")
 
