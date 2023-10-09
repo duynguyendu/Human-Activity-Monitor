@@ -1,3 +1,5 @@
+from typing import Any
+
 import torch
 import torch.nn as nn
 from torchvision.models.vision_transformer import (
@@ -20,9 +22,7 @@ __all__ = [
 
 
 class ViTModule(nn.Module):
-    def __init__(
-            self, features: nn.Module, num_classes: int, freeze: bool = False
-        ) -> None:
+    def __init__(self, features: nn.Module, num_classes: int, freeze: bool = False) -> None:
         super().__init__()
         self.num_classes = num_classes
         self.model = features
@@ -40,40 +40,65 @@ class ViTModule(nn.Module):
 
 
 class ViT_B_16(ViTModule):
-    def __init__(self, num_classes: int, pretrained: bool = False, freeze: bool = False) -> None:
+    def __init__(
+            self, num_classes: int, dropout: float = 0.0, attention_dropout: float = 0.0, pretrained: bool = False, freeze: bool = False
+        ) -> None:
         super().__init__(
-            vit_b_16(weights=ViT_B_16_Weights.DEFAULT if pretrained else None), 
+            vit_b_16(
+                weights = ViT_B_16_Weights.DEFAULT if pretrained else None, 
+                dropout = dropout, attention_dropout = attention_dropout
+            ), 
             num_classes, freeze if pretrained else False
         )
 
 
 class ViT_B_32(ViTModule):
-    def __init__(self, num_classes: int, pretrained: bool = False, freeze: bool = False) -> None:
+    def __init__(
+            self, num_classes: int, dropout: float = 0.0, attention_dropout: float = 0.0, pretrained: bool = False, freeze: bool = False
+        ) -> None:
         super().__init__(
-            vit_b_32(weights=ViT_B_32_Weights.DEFAULT if pretrained else None), 
+            vit_b_32(
+                weights = ViT_B_32_Weights.DEFAULT if pretrained else None, 
+                dropout = dropout, attention_dropout = attention_dropout
+            ), 
             num_classes, freeze if pretrained else False
         )
 
 
 class ViT_L_16(ViTModule):
-    def __init__(self, num_classes: int, pretrained: bool = False, freeze: bool = False) -> None:
+    def __init__(
+            self, num_classes: int, dropout: float = 0.0, attention_dropout: float = 0.0, pretrained: bool = False, freeze: bool = False
+        ) -> None:
         super().__init__(
-            vit_l_16(weights=ViT_L_16_Weights.DEFAULT if pretrained else None), 
+            vit_l_16(
+                weights = ViT_L_16_Weights.DEFAULT if pretrained else None, 
+                dropout = dropout, attention_dropout = attention_dropout
+            ), 
             num_classes, freeze if pretrained else False
         )
 
 
 class ViT_L_32(ViTModule):
-    def __init__(self, num_classes: int, pretrained: bool = False, freeze: bool = False) -> None:
+    def __init__(
+            self, num_classes: int, dropout: float = 0.0, attention_dropout: float = 0.0, pretrained: bool = False, freeze: bool = False
+        ) -> None:
         super().__init__(
-            vit_l_32(weights=ViT_L_32_Weights.DEFAULT if pretrained else None), 
+            vit_l_32(
+                weights = ViT_L_32_Weights.DEFAULT if pretrained else None, 
+                dropout = dropout, attention_dropout = attention_dropout
+            ), 
             num_classes, freeze if pretrained else False
         )
 
 
 class ViT_H_14(ViTModule):
-    def __init__(self, num_classes: int, pretrained: bool = False, freeze: bool = False) -> None:
+    def __init__(
+            self, num_classes: int, dropout: float = 0.0, attention_dropout: float = 0.0, pretrained: bool = False, freeze: bool = False
+        ) -> None:
         super().__init__(
-            vit_h_14(weights=ViT_H_14_Weights.DEFAULT if pretrained else None), 
+            vit_h_14(
+                weights = ViT_H_14_Weights.DEFAULT if pretrained else None, 
+                dropout = dropout, attention_dropout = attention_dropout
+            ), 
             num_classes, freeze if pretrained else False
         )
