@@ -37,6 +37,6 @@ CustomCallbacks = [
     cb.EarlyStopping(
         monitor = 'val/loss',
         min_delta = 0.0001,
-        patience = 5
+        patience = 10
     )
 ]
