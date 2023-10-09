@@ -22,6 +22,7 @@ __all__ = [
     "CustomDataModule",
     "UCF11DataModule",
     "UCF50DataModule",
+    "UCF101DataModule",
     "UTD_MHADDataModule"
 ]
 
