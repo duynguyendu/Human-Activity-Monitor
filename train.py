@@ -12,6 +12,7 @@ import torch.optim as optim
 import torch.nn as nn
 import torch
 
+from pytorch_lightning.loggers import TensorBoardLogger
 from lightning.pytorch import seed_everything, Trainer
 from rich import traceback
 traceback.install()
@@ -28,9 +29,9 @@ NUM_WOKER = int(os.cpu_count()*0.6) if torch.cuda.is_available() else 0
 
 def main(args):
     # Define dataset
-    dataset = CustomDataModule(
-        data_path = "data/UCF11",
-        sampling_value = 4,
+    dataset = UTD_MHADDataModule(
+        data_path = "data/UTD-MHAD",
+        sampling_value = 6,
         # max_frames = 32,
         batch_size = args.batch,
         num_workers = NUM_WOKER
@@ -39,7 +40,8 @@ def main(args):
     # Define model
     model = ViT_B_32(
         num_classes = len(dataset.classes),
-        # hidden_features = 128,
+        dropout = 0.25,
+        attention_dropout = 0.25,
         pretrained = True,
         freeze = False
     )
@@ -54,7 +56,7 @@ def main(args):
             optimizer = optimizer,
             gamma = 0.95
         ),
-        warmup_epochs = 3,
+        warmup_epochs = 5,
         start_factor = 0.01
     )
 
@@ -71,7 +73,8 @@ def main(args):
     trainer = Trainer(
         max_epochs = args.epoch,
         precision = "16-mixed",
-        callbacks = CustomCallbacks
+        callbacks = CustomCallbacks,
+        logger = TensorBoardLogger(save_dir="logs", name="new")
     )
 
     # Training
