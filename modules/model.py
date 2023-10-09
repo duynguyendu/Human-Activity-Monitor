@@ -37,10 +37,11 @@ class LitModel(LightningModule):
     def configure_optimizers(self):
         if not self.scheduler:
             return self.optimizer
-        if isinstance(self.optimizer, list):
-            return self.optimizer, self.scheduler if isinstance(self.scheduler, list) else [self.scheduler]
-        else:
-            return [self.optimizer], [self.scheduler]
+        if not isinstance(self.optimizer, list):
+            self.optimizer = [self.optimizer]
+        if not isinstance(self.scheduler, list):
+            self.scheduler = [self.scheduler]
+        return self.optimizer, self.scheduler
 
 
     def _log(self, stage: str, loss, y_hat, y):
