@@ -7,7 +7,7 @@ from modules.model import LitModel
 from modules.data import *
 from models import *
 
-from torch.optim.lr_scheduler import ExponentialLR
+import torch.optim.lr_scheduler as ls
 import torch.optim as optim
 import torch.nn as nn
 import torch
@@ -31,7 +31,8 @@ def main(args):
     # Define dataset
     dataset = UTD_MHADDataModule(
         data_path = "data/UTD-MHAD",
-        sampling_value = 6,
+        augmentation = True,
+        sampling_value = 2,
         # max_frames = 32,
         batch_size = args.batch,
         num_workers = NUM_WOKER
@@ -40,8 +41,8 @@ def main(args):
     # Define model
     model = ViT_B_32(
         num_classes = len(dataset.classes),
-        dropout = 0.25,
-        attention_dropout = 0.25,
+        dropout = 0.0,
+        attention_dropout = 0.2,
         pretrained = True,
         freeze = False
     )
@@ -52,11 +53,11 @@ def main(args):
 
     # Setup scheduler
     scheduler = scheduler_with_warmup(
-        scheduler = ExponentialLR(
+        scheduler = ls.CosineAnnealingLR(
             optimizer = optimizer,
-            gamma = 0.95
+            T_max = args.epoch - 10
         ),
-        warmup_epochs = 5,
+        warmup_epochs = 10,
         start_factor = 0.01
     )
 

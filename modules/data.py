@@ -5,7 +5,7 @@ import random
 import shutil
 import os
 
-from modules.transform import DataAugmentation
+from modules.transform import DataTransformation
 from modules.processing import VideoProcessing
 
 from torch.utils.data import DataLoader, ConcatDataset
@@ -35,6 +35,7 @@ class CustomDataModule(LightningDataModule):
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
             keep_temp: bool = False,
+            augmentation: bool = False,
             sampling_value: int = 0,
             max_frames: int = 0,
             min_frames: int = 0,
@@ -51,8 +52,9 @@ class CustomDataModule(LightningDataModule):
         self.split_size = train_val_test_split
         self.workers = num_workers
         self.keep_temp = keep_temp
+        self.augmentation = augmentation
         self.processer = VideoProcessing(sampling_value, max_frames, min_frames, image_size)
-        self.transform = DataAugmentation(image_size)
+        self.transform = DataTransformation(image_size)
         self.loader_config = {
             "batch_size": batch_size,
             "num_workers": num_workers,
@@ -166,10 +168,11 @@ class CustomDataModule(LightningDataModule):
         Setup data
         """
         if not hasattr(self, "dataset"):
-            self.train_data = ImageFolder(os.path.join(self.x_path, "train"), transform=self.transform)
+            self.train_data = ImageFolder(os.path.join(self.x_path, "train"), 
+                                          transform=self.transform.AUGMENTATION if self.augmentation else self.transform)
             self.val_data = ImageFolder(os.path.join(self.x_path, "val"), transform=self.transform)
             self.test_data = ImageFolder(os.path.join(self.x_path, "test"), transform=self.transform)
-            
+
             self.dataset = ConcatDataset([self.train_data, self.val_data, self.test_data])
 
         if stage == "fit":
@@ -198,6 +201,7 @@ class UCF11DataModule(CustomDataModule):
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
             keep_temp: bool = False,
+            augmentation: bool = False,
             sampling_value: int = 0,
             max_frames: int = 0,
             min_frames: int = 0,
@@ -217,6 +221,7 @@ class UCF50DataModule(CustomDataModule):
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
             keep_temp: bool = False,
+            augmentation: bool = False,
             sampling_value: int = 0,
             max_frames: int = 0,
             min_frames: int = 0,
@@ -236,6 +241,7 @@ class UCF101DataModule(CustomDataModule):
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
             keep_temp: bool = False,
+            augmentation: bool = False,
             sampling_value: int = 0,
             max_frames: int = 0,
             min_frames: int = 0,
@@ -255,6 +261,7 @@ class HMDB51DataModule(CustomDataModule):
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
             keep_temp: bool = False,
+            augmentation: bool = False,
             sampling_value: int = 0,
             max_frames: int = 0,
             min_frames: int = 0,
@@ -289,6 +296,7 @@ class UTD_MHADDataModule(CustomDataModule):
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
             keep_temp: bool = False,
+            augmentation: bool = False,
             sampling_value: int = 0,
             max_frames: int = 0,
             min_frames: int = 0,
@@ -357,7 +365,8 @@ class UTD_MHADDataModule(CustomDataModule):
             with Pool(self.workers) as pool:
                 pool.map(self._frame_generate, video_paths)
 
-            shutil.rmtree(self.temp_path)
+            self._save_config()
+            shutil.rmtree(self.temp_path) if not self.keep_temp else None
             print("[bold]Processing data:[/] Done              ")
 
         else:
