@@ -7,7 +7,7 @@ from torch import Tensor
 
 
 
-class DataAugmentation:
+class DataTransformation:
     """
     Contain some available transfrom for image
     
@@ -50,7 +50,20 @@ class DataAugmentation:
 
 
     @property
-    def CUSTOM(self):
+    def TOPIL(self):
+        return T.Compose([
+            T.ToPILImage(),
+            T.Resize(self.image_size, antialias=True),
+            T.ToTensor(),
+            T.Normalize(
+                mean = [0.485, 0.456, 0.406], 
+                std = [0.229, 0.224, 0.225]
+            ),
+        ])
+
+
+    @property
+    def AUGMENTATION(self):
         return T.Compose([
             T.RandomResizedCrop(self.image_size, antialias=True),
             T.RandomHorizontalFlip(),
