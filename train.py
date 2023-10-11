@@ -1,7 +1,6 @@
 from argparse import ArgumentParser
 import os
 
-from modules.scheduler import scheduler_with_warmup
 from modules.callback import CustomCallbacks
 from modules.model import LitModel
 from modules.data import *
@@ -22,6 +21,9 @@ traceback.install()
 # Set seed
 seed_everything(seed=42, workers=True)
 
+# Set precision
+torch.set_float32_matmul_precision('high')
+
 # Set number of worker (CPU will be used | Default: 60%)
 NUM_WOKER = int(os.cpu_count()*0.6) if torch.cuda.is_available() else 0
 
@@ -29,11 +31,10 @@ NUM_WOKER = int(os.cpu_count()*0.6) if torch.cuda.is_available() else 0
 
 def main(args):
     # Define dataset
-    dataset = UTD_MHADDataModule(
-        data_path = "data/UTD-MHAD",
-        augmentation = True,
-        sampling_value = 2,
-        # max_frames = 32,
+    dataset = CustomDataModule(
+        data_path = "data/HMDB51",
+        augment_level = 0,
+        sampling_value = 4,
         batch_size = args.batch,
         num_workers = NUM_WOKER
     )
@@ -42,7 +43,7 @@ def main(args):
     model = ViT_B_32(
         num_classes = len(dataset.classes),
         dropout = 0.0,
-        attention_dropout = 0.2,
+        attention_dropout = 0.0,
         pretrained = True,
         freeze = False
     )
@@ -52,21 +53,18 @@ def main(args):
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.learning_rate)
 
     # Setup scheduler
-    scheduler = scheduler_with_warmup(
-        scheduler = ls.CosineAnnealingLR(
-            optimizer = optimizer,
-            T_max = args.epoch - 10
-        ),
-        warmup_epochs = 10,
-        start_factor = 0.01
-    )
+    scheduler_config = {
+        "scheduler": ls.CosineAnnealingLR(optimizer=optimizer, T_max=args.epoch),
+        "warmup_epochs": 3,
+        "start_factor": 0.01
+    }
 
     # Lightning model
     lit_model = LitModel(
         model = model,
         criterion = loss,
         optimizer = optimizer,
-        scheduler = scheduler,
+        scheduler = scheduler_config,
         checkpoint = args.checkpoint
     )
 
@@ -74,7 +72,7 @@ def main(args):
     trainer = Trainer(
         max_epochs = args.epoch,
         precision = "16-mixed",
-        callbacks = CustomCallbacks,
+        callbacks = CustomCallbacks(early_stopping=False),
         logger = TensorBoardLogger(save_dir="logs", name="new")
     )
 
