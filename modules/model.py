@@ -1,5 +1,7 @@
-from rich import print
+from typing import Dict
 import os
+
+from modules.scheduler import scheduler_with_warmup
 
 from torchmetrics.functional import accuracy
 import torch.optim as optim
@@ -7,6 +9,7 @@ import torch.nn as nn
 import torch
 
 from lightning.pytorch import LightningModule
+from rich import print
 
 
 
@@ -17,7 +20,7 @@ class LitModel(LightningModule):
             self, 
             model: nn.Module,
             criterion: nn.Module = None,
-            optimizer: optim.Optimizer = None,
+            optimizer: optim.Optimizer | Dict = None,
             scheduler: optim.Optimizer = None,
             checkpoint: str = None
         ):
@@ -37,6 +40,8 @@ class LitModel(LightningModule):
     def configure_optimizers(self):
         if not self.scheduler:
             return self.optimizer
+        if isinstance(self.scheduler, dict):
+            self.scheduler = scheduler_with_warmup(**self.scheduler)
         if not isinstance(self.optimizer, list):
             self.optimizer = [self.optimizer]
         if not isinstance(self.scheduler, list):
