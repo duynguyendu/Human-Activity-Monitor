@@ -35,7 +35,7 @@ class CustomDataModule(LightningDataModule):
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
             keep_temp: bool = False,
-            augmentation: bool = False,
+            augment_level: int = 0,
             sampling_value: int = 0,
             max_frames: int = 0,
             min_frames: int = 0,
@@ -52,7 +52,7 @@ class CustomDataModule(LightningDataModule):
         self.split_size = train_val_test_split
         self.workers = num_workers
         self.keep_temp = keep_temp
-        self.augmentation = augmentation
+        self.augment_level = augment_level
         self.processer = VideoProcessing(sampling_value, max_frames, min_frames, image_size)
         self.transform = DataTransformation(image_size)
         self.loader_config = {
@@ -168,8 +168,15 @@ class CustomDataModule(LightningDataModule):
         Setup data
         """
         if not hasattr(self, "dataset"):
-            self.train_data = ImageFolder(os.path.join(self.x_path, "train"), 
-                                          transform=self.transform.AUGMENTATION if self.augmentation else self.transform)
+            transform_lv = {
+                0: self.transform.DEFAULT,
+                1: self.transform.AUGMENT_LV1,
+                2: self.transform.AUGMENT_LV2,
+                3: self.transform.AUGMENT_LV3,
+                4: self.transform.AUGMENT_LV4,
+                5: self.transform.AUGMENT_LV5,
+            }
+            self.train_data = ImageFolder(os.path.join(self.x_path, "train"), transform=transform_lv.get(self.augment_level))
             self.val_data = ImageFolder(os.path.join(self.x_path, "val"), transform=self.transform)
             self.test_data = ImageFolder(os.path.join(self.x_path, "test"), transform=self.transform)
 
@@ -201,7 +208,7 @@ class UCF11DataModule(CustomDataModule):
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
             keep_temp: bool = False,
-            augmentation: bool = False,
+            augment_level: int = 0,
             sampling_value: int = 0,
             max_frames: int = 0,
             min_frames: int = 0,
@@ -221,7 +228,7 @@ class UCF50DataModule(CustomDataModule):
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
             keep_temp: bool = False,
-            augmentation: bool = False,
+            augment_level: int = 0,
             sampling_value: int = 0,
             max_frames: int = 0,
             min_frames: int = 0,
@@ -241,7 +248,7 @@ class UCF101DataModule(CustomDataModule):
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
             keep_temp: bool = False,
-            augmentation: bool = False,
+            augment_level: int = 0,
             sampling_value: int = 0,
             max_frames: int = 0,
             min_frames: int = 0,
@@ -261,7 +268,7 @@ class HMDB51DataModule(CustomDataModule):
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
             keep_temp: bool = False,
-            augmentation: bool = False,
+            augment_level: int = 0,
             sampling_value: int = 0,
             max_frames: int = 0,
             min_frames: int = 0,
@@ -296,7 +303,7 @@ class UTD_MHADDataModule(CustomDataModule):
             batch_size: int = 32,
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
             keep_temp: bool = False,
-            augmentation: bool = False,
+            augment_level: int = 0,
             sampling_value: int = 0,
             max_frames: int = 0,
             min_frames: int = 0,
