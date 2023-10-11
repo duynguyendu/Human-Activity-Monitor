@@ -1,5 +1,3 @@
-from typing import Any
-
 import torch
 import torch.nn as nn
 from torchvision.models.vision_transformer import (
