@@ -1,3 +1,3 @@
-from .VGG import *
-from .Vision_Transformer import *
+from .VGG import VGG
+from .Vision_Transformer import ViT
 from .CustomViT import *

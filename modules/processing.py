@@ -29,15 +29,15 @@ class VideoProcessing():
     """
 
     def __init__(
-            self, 
-            sampling_value: int, 
-            max_frames: int, 
-            min_frames: int, 
-            size: Tuple[int, int]
+            self,
+            sampling_value: int = 0,
+            max_frame: int = 0,
+            min_frame: int = 0,
+            size: Tuple[int, int] = 0
         ) -> None:
         self.sampling_value = sampling_value
-        self.max_frames = max_frames
-        self.min_frames = min_frames
+        self.max_frame = max_frame
+        self.min_frame = min_frame
         self.size = size
 
 
@@ -76,11 +76,10 @@ class VideoProcessing():
         Cut both head and last if video length > max_frame
         Output is the middle of the source video
         """
-        if max_frame > 0:
-            middle_frame = len(video) // 2
-            m = max_frame // 2
-            r = max_frame % 2
-            video = video[middle_frame - m : middle_frame + m + r]
+        middle_frame = len(video) // 2
+        m = max_frame // 2
+        r = max_frame % 2
+        video = video[middle_frame - m : middle_frame + m + r]
         return video
 
 
@@ -88,10 +87,9 @@ class VideoProcessing():
         """
         Pad black frame to end of video if video length < min_frame
         """
-        if min_frame > 0:
-            zeros_array = np.zeros((min_frame, *video.shape[1:]), dtype=np.uint8)
-            zeros_array[:len(video), ...] = video
-            video = zeros_array
+        zeros_array = np.zeros((min_frame, *video.shape[1:]), dtype=np.uint8)
+        zeros_array[:len(video), ...] = video
+        video = zeros_array
         return video
 
 
@@ -106,9 +104,14 @@ class VideoProcessing():
         """
         Auto apply: Load -> Sampling -> Truncating -> Padding -> Resize
         """
+        # Load
         video = self.load(path)
-        video = self.sampling(video, self.sampling_value)
-        video = self.truncating(video, self.max_frames)
-        video = self.padding(video, self.min_frames)
-        video = self.resize(video, self.size)
+        # Sampling
+        video = self.sampling(video, self.sampling_value) if self.sampling_value > 0 else video
+        # Truncating
+        video = self.truncating(video, self.max_frame) if self.max_frame > 0 else video
+        # Padding
+        video = self.padding(video, self.min_frame) if self.min_frame > 0 else video
+        # Resize (int -> tuple)
+        video = self.resize(video, (self.size, self.size) if isinstance(self.size, int) and self.size > 0 else self.size)
         return video

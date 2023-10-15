@@ -30,17 +30,36 @@ NUM_WOKER = int(os.cpu_count()*0.6) if torch.cuda.is_available() else 0
 
 
 def main(args):
+    # Config data generate
+    processer = DataProcessing(
+        save_path = 'data',
+        sampling_value = 4,
+        image_size = (224, 224),
+        train_val_test_split = (0.7, 0.15, 0.15),  
+        max_frame = 0,
+        min_frame = 0,
+        num_workers = NUM_WOKER,
+        keep_temp = False
+    )
+
+    # Generate data
+    processer(
+        data_path = 'data/UCF11',
+        save_name = False,
+        remake = False
+    )
+
     # Define dataset
     dataset = CustomDataModule(
-        data_path = "data/HMDB51",
-        augment_level = 0,
-        sampling_value = 4,
+        data_path = processer.save_path,
         batch_size = args.batch,
-        num_workers = NUM_WOKER
+        num_workers = NUM_WOKER,
+        augment_level = 0,
     )
 
     # Define model
-    model = ViT_B_32(
+    model = ViT(
+        version = "B_32",
         num_classes = len(dataset.classes),
         dropout = 0.0,
         attention_dropout = 0.0,
@@ -55,7 +74,7 @@ def main(args):
     # Setup scheduler
     scheduler_config = {
         "scheduler": ls.CosineAnnealingLR(optimizer=optimizer, T_max=args.epoch),
-        "warmup_epochs": 3,
+        "warmup_epochs": 5,
         "start_factor": 0.01
     }
 
@@ -67,6 +86,13 @@ def main(args):
         scheduler = scheduler_config,
         checkpoint = args.checkpoint
     )
+
+    # Save config
+    lit_model.hparams.update({
+        "model": model._get_name(),
+        "dataset": processer.data_name,
+    })
+    lit_model.save_hyperparameters()
 
     # Lightning trainer
     trainer = Trainer(
