@@ -3,7 +3,7 @@ from collections import Counter
 import random
 import os
 
-from modules.transform import DataAugmentation
+from modules.transform import DataTransformation
 from modules.processing import VideoProcessing
 from modules.model import LitModel
 from modules.data import *
@@ -23,27 +23,26 @@ traceback.install()
 # seed_everything(seed=42, workers=True)
 
 # Set number of worker (CPU will be used | Default: 80%)
-NUM_WOKER = int(os.cpu_count()*0.8) if torch.cuda.is_available() else 0
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-TRANSFORM = DataAugmentation().DEFAULT
+TRANSFORM = DataTransformation().DEFAULT
 VP = VideoProcessing(
-    sampling_value = 2,
+    sampling_value = 1,
     max_frames = 0,
     min_frames = 0,
     size = (750, 750)
 )
 
 
-DATA_PATH = "data/UCF-101"
-CLASESS = sorted(os.listdir(DATA_PATH))
+DATA_PATH = "data/UTD-MHAD"
+CLASESS = sorted(os.listdir(DATA_PATH + "_x/test"))
 
 SHOW_VIDEO = True
-NUM_VIDEO = 3   # number of random video
-WAITKEY = 45    # millisecond before next frame
+NUM_VIDEO = 20   # number of random video
+WAITKEY = 30    # millisecond before next frame
 
-MODEL = ViT_B_32(num_classes=len(CLASESS))
+MODEL = ViT_v1(num_classes=len(CLASESS))
 
-CHECKPOINT = "lightning_logs/ViT_B_32_UCF101/checkpoints/epoch=14-step=23415.ckpt"
+CHECKPOINT = "logs/new/version_4/checkpoints/epoch=89-step=9090.ckpt"
 
 
 
@@ -74,21 +73,22 @@ def main(args):
 
             total.append(result)
 
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            if SHOW_VIDEO:
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
-            cv2.putText(
-                frame, result, 
-                (10, frame.shape[0] - 30), cv2.FONT_HERSHEY_SIMPLEX, 
-                2, (255, 0, 0), 5
-            )
+                cv2.putText(
+                    frame, result, 
+                    (10, frame.shape[0] - 30), cv2.FONT_HERSHEY_SIMPLEX, 
+                    2, (255, 0, 0), 5
+                )
 
-            cv2.imshow(path, frame) if SHOW_VIDEO else None
+                cv2.imshow(path, frame)
 
-            key = cv2.waitKey(WAITKEY) & 0xFF
-            if key == ord('c'):
-                break
-            if key == ord('q'):
-                exit()
+                key = cv2.waitKey(WAITKEY) & 0xFF
+                if key == ord('c'):
+                    break
+                if key == ord('q'):
+                    exit()
 
         sorted_list = sorted(total, key=lambda x: (-Counter(total)[x], x), reverse=True)
 

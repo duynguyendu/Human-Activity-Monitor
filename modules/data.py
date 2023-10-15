@@ -1,4 +1,4 @@
-from typing import List, Tuple, Union
+from typing import Any, List, Tuple, Union
 from multiprocessing import Pool
 from pathlib import Path
 import random
@@ -19,52 +19,34 @@ import yaml
 
 
 __all__ = [
-    "CustomDataModule",
-    "UCF11DataModule",
-    "UCF50DataModule",
-    "UCF101DataModule",
-    "UTD_MHADDataModule"
+    "DataProcessing",
+    "CustomDataModule"
 ]
 
 
 
-class CustomDataModule(LightningDataModule):
+class DataProcessing:
     def __init__(
-            self, 
-            data_path: str, 
-            batch_size: int = 32,
+            self,
+            save_path: str = "data",
             train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
-            keep_temp: bool = False,
-            augment_level: int = 0,
-            sampling_value: int = 0,
-            max_frames: int = 0,
-            min_frames: int = 0,
             image_size: Tuple[int, int] = (224, 224),
+            sampling_value: int = 0,
+            max_frame: int = 0,
+            min_frame: int = 0,
             num_workers: int = 0,
-            pin_memory: bool = True,
-        ):
-        super().__init__()
-        self.root = data_path
-        self.x_path = data_path + "_x"
-        self.temp_path = data_path + "_tmp"
-        self.config_path = os.path.join(self.x_path, "config.yaml")
-        self.extensions = ['.mp4', '.avi', '.mkv', '.mov', '.flv', '.mpg']
+            keep_temp: bool = False,
+        ) -> None:
+        self.save_path = save_path
         self.split_size = train_val_test_split
-        self.workers = num_workers
         self.keep_temp = keep_temp
-        self.augment_level = augment_level
-        self.processer = VideoProcessing(sampling_value, max_frames, min_frames, image_size)
-        self.transform = DataTransformation(image_size)
-        self.loader_config = {
-            "batch_size": batch_size,
-            "num_workers": num_workers,
-            "pin_memory": pin_memory,
-        }
+        self.workers = num_workers
+        self.extensions = ['.mp4', '.avi', '.mkv', '.mov', '.flv', '.mpg']
+        self.processer = VideoProcessing(sampling_value, max_frame, min_frame, image_size)
 
 
-    @property
-    def classes(self) -> List[str]:
-        return sorted(os.listdir(self.root))
+    def __call__(self, data_path: str, save_name: str = None, remake = False):
+        return self.auto(data_path, save_name, remake)
 
 
     def _frame_generate(self, path: str) -> None:
@@ -72,7 +54,7 @@ class CustomDataModule(LightningDataModule):
         process and save processed video
         """
         file_name = path.split("/")[-1][:-4]
-        dst_path = "/".join(path.replace(self.temp_path, self.x_path).split("/")[:-1])
+        dst_path = "/".join(path.replace(self.temp_path, self.save_path).split("/")[:-1])
         os.makedirs(dst_path, exist_ok=True)
         video = self.processer(path)
         for i, frame in enumerate(video):
@@ -88,7 +70,7 @@ class CustomDataModule(LightningDataModule):
         [os.makedirs(path, exist_ok=True) for path in dst_paths]
 
         # Get all video path in source folder
-        class_path = os.path.join(self.root, class_folder)
+        class_path = os.path.join(self.data_path, class_folder)
         video_paths = [str(video) for ext in self.extensions for video in Path(class_path).rglob("*" + ext)]
 
         num_videos = len(video_paths)
@@ -111,42 +93,41 @@ class CustomDataModule(LightningDataModule):
                     shutil.copyfile(video_path, dst_path)
 
 
-    def _save_config(self):
-        with open(self.config_path, "w") as config:
+    def _save_config(self, path: str):
+        with open(path, "w") as config:
             config.write(
-                "# `_x` is the folder containing processed files.\n"
+                "# This folder containing processed data\n"
                 "\n"
-                "# Parameters:\n"
-                "# -----------\n"
-                "# - image_size: Size of the image.\n"
-                "# - max_frame: Equally trim both head and tail if video length > max_frame.\n"
-                "# - min_frame: Pad black frame to end of video if video length < min_frame.\n"
-                "# - sampling: Choose 1 frame every n frames.\n"
-                "# - train_val_test_split: Train, val, test split size.\n"
-                "\n"
-                f"# Number of images: {len([image for image in Path(self.x_path).rglob('*.jpg')])}\n"
-                f"# Number of classes: {len(self.classes)}\n"
+                f"# Number of images: {len([image for image in Path(self.save_path).rglob('*.jpg')])}\n"
+                f"# Number of classes: {len(os.listdir(self.data_path))}\n"
                 "\n"
             )
             yaml.dump({
                 "train_val_test_split": self.split_size,
                 "sampling_value": self.processer.sampling_value,
-                "max_frames": self.processer.max_frames,
-                "min_frames": self.processer.min_frames,
-                "image_size": self.transform.image_size,
+                "max_frame": self.processer.max_frame,
+                "min_frame": self.processer.min_frame,
+                "image_size": self.processer.size,
             }, config, default_flow_style=False)
 
 
-    def prepare_data(self):
+    def auto(self, data_path: str, save_name: str = False, remake = False):
         """
         Preprocess data
         """
-        if not os.path.exists(self.root):
-            raise FileNotFoundError(self.root)
+        if not os.path.exists(data_path):
+           raise FileNotFoundError(data_path)
 
-        if not os.path.exists(self.x_path):
+        self.data_path = data_path
+        self.data_name = save_name if save_name else self.data_path.split("/")[-1]
+        self.temp_path = os.path.join(self.save_path, self.data_name + "_tmp")
+        self.save_path = os.path.join(
+            self.save_path, self.data_name + ("_x" if os.path.exists(os.path.join(self.save_path, self.data_name)) else "")
+        )
+
+        if not os.path.exists(self.save_path) or remake:
             print("[bold]Processing data:[/] Splitting data... ", end="\r")
-            class_folders = os.listdir(self.root)
+            class_folders = os.listdir(self.data_path)
             with Pool(self.workers) as pool:
                 pool.map(self._split_data, class_folders)
 
@@ -155,7 +136,7 @@ class CustomDataModule(LightningDataModule):
             with Pool(self.workers) as pool:
                 pool.map(self._frame_generate, video_paths)
 
-            self._save_config()
+            self._save_config(os.path.join(self.save_path, "config.yaml"))
             shutil.rmtree(self.temp_path) if not self.keep_temp else None
             print("[bold]Processing data:[/] Done              ")
 
@@ -163,27 +144,54 @@ class CustomDataModule(LightningDataModule):
             print("[bold]Processing data:[/] Existed")
 
 
+
+class CustomDataModule(LightningDataModule):
+    def __init__(
+            self, 
+            data_path: str,
+            batch_size: int = 32,
+            augment_level: int = 0,
+            image_size: Tuple[int, int] = (224, 224),
+            num_workers: int = 0,
+            pin_memory: bool = True,
+        ):
+        super().__init__()
+        self.data_path = data_path
+        self.workers = num_workers
+        self.augment_level = augment_level
+        self.transform = DataTransformation(image_size)
+        self.loader_config = {
+            "batch_size": batch_size,
+            "num_workers": num_workers,
+            "pin_memory": pin_memory,
+        }
+
+
+    @property
+    def classes(self) -> List[str]:
+        return sorted(os.listdir(os.path.join(self.data_path, "train")))
+
+
+    def prepare_data(self):
+        if not os.path.exists(self.data_path):
+            raise FileNotFoundError(self.data_path)
+
+
     def setup(self, stage: str):
         """
         Setup data
         """
         if not hasattr(self, "dataset"):
-            transform_lv = {
-                0: self.transform.DEFAULT,
-                1: self.transform.AUGMENT_LV1,
-                2: self.transform.AUGMENT_LV2,
-                3: self.transform.AUGMENT_LV3,
-                4: self.transform.AUGMENT_LV4,
-                5: self.transform.AUGMENT_LV5,
-            }
-            self.train_data = ImageFolder(os.path.join(self.x_path, "train"), transform=transform_lv.get(self.augment_level))
-            self.val_data = ImageFolder(os.path.join(self.x_path, "val"), transform=self.transform)
-            self.test_data = ImageFolder(os.path.join(self.x_path, "test"), transform=self.transform)
+            transform_lv = {i: getattr(self.transform, f'AUGMENT_LV{i}') for i in range(6)}
+
+            self.train_data = ImageFolder(os.path.join(self.data_path, "train"), transform=transform_lv.get(self.augment_level))
+            self.val_data = ImageFolder(os.path.join(self.data_path, "val"), transform=self.transform)
+            self.test_data = ImageFolder(os.path.join(self.data_path, "test"), transform=self.transform)
 
             self.dataset = ConcatDataset([self.train_data, self.val_data, self.test_data])
 
         if stage == "fit":
-            print(f"[bold]Data path:[/] [green]{self.root}[/]")
+            print(f"[bold]Data path:[/] [green]{self.data_path}[/]")
             print(f"[bold]Number of data:[/] {len(self.dataset):,}")
             print(f"[bold]Number of classes:[/] {len(self.classes):,}")
 
@@ -198,86 +206,6 @@ class CustomDataModule(LightningDataModule):
 
     def test_dataloader(self):
         return DataLoader(dataset=self.test_data, **self.loader_config, shuffle=False)
-
-
-
-class UCF11DataModule(CustomDataModule):
-    def __init__(
-            self, 
-            data_path: str, 
-            batch_size: int = 32,
-            train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
-            keep_temp: bool = False,
-            augment_level: int = 0,
-            sampling_value: int = 0,
-            max_frames: int = 0,
-            min_frames: int = 0,
-            image_size: Tuple[int, int] = (224, 224),
-            num_workers: int = 0,
-            pin_memory: bool = True,
-        ):
-        self.save_hyperparameters()
-        super().__init__(**self.hparams)
-
-
-
-class UCF50DataModule(CustomDataModule):
-    def __init__(
-            self, 
-            data_path: str, 
-            batch_size: int = 32,
-            train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
-            keep_temp: bool = False,
-            augment_level: int = 0,
-            sampling_value: int = 0,
-            max_frames: int = 0,
-            min_frames: int = 0,
-            image_size: Tuple[int, int] = (224, 224),
-            num_workers: int = 0,
-            pin_memory: bool = True,
-        ):
-        self.save_hyperparameters()
-        super().__init__(**self.hparams)
-
-
-
-class UCF101DataModule(CustomDataModule):
-    def __init__(
-            self, 
-            data_path: str, 
-            batch_size: int = 32,
-            train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
-            keep_temp: bool = False,
-            augment_level: int = 0,
-            sampling_value: int = 0,
-            max_frames: int = 0,
-            min_frames: int = 0,
-            image_size: Tuple[int, int] = (224, 224),
-            num_workers: int = 0,
-            pin_memory: bool = True,
-        ):
-        self.save_hyperparameters()
-        super().__init__(**self.hparams)
-
-
-
-class HMDB51DataModule(CustomDataModule):
-    def __init__(
-            self, 
-            data_path: str, 
-            batch_size: int = 32,
-            train_val_test_split: Tuple[float, float, float] = (0.7, 0.15, 0.15),
-            keep_temp: bool = False,
-            augment_level: int = 0,
-            sampling_value: int = 0,
-            max_frames: int = 0,
-            min_frames: int = 0,
-            image_size: Tuple[int, int] = (224, 224),
-            num_workers: int = 0,
-            pin_memory: bool = True,
-        ):
-        self.save_hyperparameters()
-        super().__init__(**self.hparams)
 
 
 
