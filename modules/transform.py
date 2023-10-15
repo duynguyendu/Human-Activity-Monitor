@@ -60,6 +60,13 @@ class DataTransformation:
         ])
 
 
+
+    @property
+    def AUGMENT_LV0(self):
+        """ Femboy 🫵 """
+        return self.DEFAULT
+
+
     @property
     def AUGMENT_LV1(self):
         """ Survivor 🌟 """
