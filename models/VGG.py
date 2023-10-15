@@ -1,33 +1,40 @@
-import torch
+from torchvision.models.vgg import *
 import torch.nn as nn
-from torchvision.models.vgg import (
-    vgg11_bn, VGG11_BN_Weights, 
-    vgg13_bn, VGG13_BN_Weights,
-    vgg16_bn, VGG16_BN_Weights, 
-    vgg19_bn, VGG19_BN_Weights,
-)
-
-
-__all__ = [
-    "VGG11",
-    "VGG13",
-    "VGG16",
-    "VGG19"
-]
+import torch
 
 
 
-class VGGModule(nn.Module):
+class VGG(nn.Module):
+    versions = {
+        "11": ( vgg11_bn, VGG11_BN_Weights.DEFAULT ),
+        "13": ( vgg13_bn, VGG13_BN_Weights.DEFAULT ),
+        "16": ( vgg16_bn, VGG16_BN_Weights.DEFAULT ),
+        "19": ( vgg19_bn, VGG19_BN_Weights.DEFAULT )
+    }
+
     def __init__(
-            self, features: nn.Module, num_classes: int,  hidden_features: int = 4096, dropout: int = 0.5, freeze: bool = False
+            self,
+            version: str,
+            num_classes: int,
+            hidden_features: int = 4096,
+            dropout: int = 0.0,
+            pretrained: bool = False,
+            freeze: bool = False
         ) -> None:
         super().__init__()
         self.num_classes = num_classes
-        self.model = features
+
+        if version not in self.versions:
+            raise ValueError(f"Versions available: {list(self.versions.keys())}")
+
+        model, weight = self.versions.get(version)
+        self.features: nn.Module = model(weights=weight if pretrained else None, dropout=dropout)
+
         if freeze:
-            for param in self.model.parameters():
+            for param in self.features.parameters():
                 param.requires_grad = False
-        self.model.classifier = nn.Sequential(
+
+        self.features.classifier = nn.Sequential(
             nn.Linear(512 * 7 * 7, hidden_features),
             nn.ReLU(True),
             nn.Dropout(p=dropout),
@@ -39,49 +46,4 @@ class VGGModule(nn.Module):
 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.model(x)
-
-
-
-class VGG11(VGGModule):
-    def __init__(
-            self, num_classes: int, hidden_features: int = 4069, dropout: int = 0.5, pretrained: bool = False, freeze: bool = False
-        ) -> None:
-        super().__init__(
-            vgg11_bn(weights=VGG11_BN_Weights.DEFAULT if pretrained else None), 
-            num_classes, hidden_features, dropout, 
-            freeze if pretrained else False
-        )
-
-
-class VGG13(VGGModule):
-    def __init__(
-            self, num_classes: int, hidden_features: int = 4069, dropout: int = 0.5, pretrained: bool = False, freeze: bool = False
-        ) -> None:
-        super().__init__(
-            vgg13_bn(weights=VGG13_BN_Weights.DEFAULT if pretrained else None), 
-            num_classes, hidden_features, dropout, 
-            freeze if pretrained else False
-        )
-
-
-class VGG16(VGGModule):
-    def __init__(
-            self, num_classes: int, hidden_features: int = 4069, dropout: int = 0.5, pretrained: bool = False, freeze: bool = False
-        ) -> None:
-        super().__init__(
-            vgg16_bn(weights=VGG16_BN_Weights.DEFAULT if pretrained else None), 
-            num_classes, hidden_features, dropout, 
-            freeze if pretrained else False
-        )
-
-
-class VGG19(VGGModule):
-    def __init__(
-            self, num_classes: int, hidden_features: int = 4069, dropout: int = 0.5, pretrained: bool = False, freeze: bool = False
-        ) -> None:
-        super().__init__(
-            vgg19_bn(weights=VGG19_BN_Weights.DEFAULT if pretrained else None), 
-            num_classes, hidden_features, dropout, 
-            freeze if pretrained else False
-        )
+        return self.features(x)
