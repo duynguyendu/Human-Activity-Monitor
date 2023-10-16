@@ -44,8 +44,8 @@ def main(args):
 
     # Generate data
     processer(
-        data_path = 'data/UCF11',
-        save_name = False,
+        data_path = 'data/UTD-MAHD',
+        save_name = None,
         remake = False
     )
 
@@ -88,11 +88,10 @@ def main(args):
     )
 
     # Save config
-    lit_model.hparams.update({
+    lit_model.save_hparams({
         "model": model._get_name(),
-        "dataset": processer.data_name,
+        "dataset": dataset.data_path,
     })
-    lit_model.save_hyperparameters()
 
     # Lightning trainer
     trainer = Trainer(
