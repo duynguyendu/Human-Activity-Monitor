@@ -93,3 +93,9 @@ class LitModel(LightningModule):
             strict = strict
         )
         print("[bold]Load checkpoint:[/] Done") if verbose else None
+
+
+    def save_hparams(self, config: Dict):
+        if isinstance(config, dict):
+            self.hparams.update(config)
+        self.save_hyperparameters()
