@@ -34,7 +34,7 @@ VP = VideoProcessing(
 
 
 DATA_PATH = "data/UTD-MHAD"
-CLASESS = sorted(os.listdir(DATA_PATH + "_x/test"))
+CLASESS = sorted(os.listdir(DATA_PATH))
 
 SHOW_VIDEO = True
 NUM_VIDEO = 20   # number of random video
