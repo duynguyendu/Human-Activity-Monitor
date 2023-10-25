@@ -1,7 +1,8 @@
+from rich import print
+import yaml
+
 from lightning.pytorch import Trainer, LightningModule
 import lightning.pytorch.callbacks as cb
-
-from rich import print
 
 
 
@@ -23,31 +24,20 @@ class PrintTrainResult(cb.Callback):
         )
 
 
-def CustomCallbacks(
-        model_summary: bool = True,
-        progress_bar: bool = True,
-        lr_monitor: bool = True,
-        checkpoint: bool = True,
-        early_stopping: bool = True
-    ):
+def custom_callbacks():
+    with open("./configs/callback.yaml", 'r') as file:
+        cfg = yaml.safe_load(file)
     callbacks = []
-    callbacks.append(PrintTrainResult())
-    callbacks.append(cb.RichModelSummary()) if model_summary else None
-    callbacks.append(cb.RichProgressBar()) if progress_bar else None
-    callbacks.append(cb.LearningRateMonitor('epoch')) if lr_monitor else None
-    callbacks.append(
-        cb.ModelCheckpoint(
-            monitor = 'val/loss',
-            save_weights_only = True,
-            save_top_k = 2,
-            save_last = True
-        )
-    ) if checkpoint else None
-    callbacks.append(
-        cb.EarlyStopping(
-            monitor = 'val/loss',
-            min_delta = 0.0001,
-            patience = 10
-        )
-    ) if early_stopping else None
+    if cfg['verbose']:
+        callbacks.append(PrintTrainResult())
+    if cfg['model_summary']:
+        callbacks.append(cb.RichModelSummary())
+    if cfg['progress_bar']:
+        callbacks.append(cb.RichProgressBar())
+    if cfg['lr_monitor']:
+        callbacks.append(cb.LearningRateMonitor('epoch'))
+    if cfg['enable_checkpoint']:
+        callbacks.append(cb.ModelCheckpoint(**cfg['checkpoint']))
+    if cfg['enable_early_stopping']:
+        callbacks.append(cb.EarlyStopping(**cfg['early_stopping']))
     return callbacks

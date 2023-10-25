@@ -6,26 +6,36 @@ from torch import Tensor
 
 
 
-
 class DataTransformation:
-    """
-    Contain some available transfrom for image
-    
-    Usage
-    -----
-    ```
-    image = ...
-    image_size = (224, 224)
+    def __init__(self, image_size: Tuple|list = (224, 224)) -> None:
+        """
+        Contain some available transfrom for image
 
-    transform = DataTransformation(image_size)
+        Args:
+            image_size (tuple | list, optional): Size of the output frames. Default: (224, 224)
 
-    transform(image)
-    # or
-    transform.DEFAULT(image)
-    ```
-    """
-    def __init__(self, image_size: Tuple=(224, 224)) -> None:
-        self.image_size = image_size
+        Raises:
+            TypeError: If image_size type is not tuple or list
+
+        Usage:
+            ```python
+            # PIL Image or Numpy ndarray
+            image = ...
+            # Define Image size
+            image_size = (224, 224)
+            # Define transform
+            transform = DataTransformation(image_size)
+            # Apply transform
+            result = transform(image)
+            # or
+            result = transform.AUGMENT_LV1(image)
+            ```
+        """
+        try:
+            image_size = tuple(image_size)
+        except:
+            raise TypeError("The 'image_size' parameter must be a tuple or list.")
+        self.image_size = tuple(image_size)
 
 
     def __call__(self, image: Image) -> Tensor:

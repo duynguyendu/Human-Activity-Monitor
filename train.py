@@ -1,9 +1,12 @@
-from argparse import ArgumentParser
-import os
+from omegaconf import DictConfig, open_dict
+import hydra
+import shutil
 
-from modules.callback import CustomCallbacks
+from modules.scheduler import scheduler_with_warmup
+from modules.callback import custom_callbacks
 from modules.model import LitModel
 from modules.data import *
+from modules.utils import *
 from models import *
 
 import torch.optim.lr_scheduler as ls
@@ -18,103 +21,70 @@ traceback.install()
 
 
 
-# Set seed
-seed_everything(seed=42, workers=True)
+@hydra.main(config_path="configs", config_name="train", version_base="1.3")
+def main(cfg: DictConfig) -> None:
+    # Remove the hydra outputs since we already have lightning logs
+    shutil.rmtree("outputs")
 
-# Set precision
-torch.set_float32_matmul_precision('high')
+    # Set precision
+    torch.set_float32_matmul_precision('high')
 
-# Set number of worker (CPU will be used | Default: 60%)
-NUM_WOKER = int(os.cpu_count()*0.6) if torch.cuda.is_available() else 0
-
-
-
-def main(args):
-    # Config data generate
-    processer = DataProcessing(
-        save_path = 'data',
-        sampling_value = 4,
-        image_size = (224, 224),
-        train_val_test_split = (0.7, 0.15, 0.15),  
-        max_frame = 0,
-        min_frame = 0,
-        num_workers = NUM_WOKER,
-        keep_temp = False
-    )
-
-    # Generate data
-    processer(
-        data_path = 'data/UTD-MAHD',
-        save_name = None,
-        remake = False
-    )
+    # Set seed
+    if cfg['set_seed']:
+        seed_everything(seed=cfg['set_seed'], workers=True)
 
     # Define dataset
-    dataset = CustomDataModule(
-        data_path = processer.save_path,
-        batch_size = args.batch,
-        num_workers = NUM_WOKER,
-        augment_level = 0,
+    DATASET = CustomDataModule(
+        **cfg['data'],
+        batch_size = cfg['trainer']['batch_size'],
+        num_workers = workers_handler(cfg['num_workers']) if torch.cuda.is_available() else 0
     )
 
     # Define model
-    model = ViT(
+    MODEL = ViT(
         version = "B_32",
-        num_classes = len(dataset.classes),
         dropout = 0.0,
         attention_dropout = 0.0,
-        pretrained = True,
-        freeze = False
+        num_classes = len(DATASET.classes),
+        **cfg['model']
     )
 
     # Setup loss, optimizer
-    loss = nn.CrossEntropyLoss()
-    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.learning_rate)
+    LOSS = nn.CrossEntropyLoss()
+    OPTIMIZER = optim.AdamW(MODEL.parameters(), lr=cfg['trainer']['learning_rate'], weight_decay=cfg['trainer']['learning_rate'])
 
     # Setup scheduler
-    scheduler_config = {
-        "scheduler": ls.CosineAnnealingLR(optimizer=optimizer, T_max=args.epoch),
-        "warmup_epochs": 5,
-        "start_factor": 0.01
-    }
-
-    # Lightning model
-    lit_model = LitModel(
-        model = model,
-        criterion = loss,
-        optimizer = optimizer,
-        scheduler = scheduler_config,
-        checkpoint = args.checkpoint
+    SCHEDULER = scheduler_with_warmup(
+        scheduler = ls.CosineAnnealingLR(optimizer=OPTIMIZER, T_max=cfg['trainer']['num_epoch']),
+        warmup_epochs = cfg['scheduler']['warmup_epochs'],
+        start_factor = cfg['scheduler']['start_factor']
     )
 
+    # Lightning model
+    LIT_MODEL = LitModel(MODEL, LOSS, OPTIMIZER, SCHEDULER, cfg['trainer']['checkpoint'])
+
     # Save config
-    lit_model.save_hparams({
-        "model": model._get_name(),
-        "dataset": dataset.data_path,
-    })
+    with open_dict(cfg):
+        cfg['model']['name'] = MODEL._get_name()
+        if hasattr(MODEL, "version"):
+            cfg['model']['version'] = MODEL.version
+    LIT_MODEL.save_hparams(cfg)
 
     # Lightning trainer
-    trainer = Trainer(
-        max_epochs = args.epoch,
-        precision = "16-mixed",
-        callbacks = CustomCallbacks(early_stopping=False),
+    TRAINER = Trainer(
+        max_epochs = cfg['trainer']['num_epoch'],
+        precision = cfg['trainer']['precision'],
+        callbacks = custom_callbacks(),
         logger = TensorBoardLogger(save_dir="logs", name="new")
     )
 
     # Training
-    trainer.fit(lit_model, dataset)
+    TRAINER.fit(LIT_MODEL, DATASET)
 
     # Testing
-    trainer.test(lit_model, dataset)
+    TRAINER.test(LIT_MODEL, DATASET)
 
 
 
 if __name__=="__main__":
-    parser = ArgumentParser()
-    parser.add_argument("-e", "--epoch", type=int, default=100)
-    parser.add_argument("-b", "--batch", type=int, default=None)
-    parser.add_argument("-lr", "--learning_rate", type=float, default=None)
-    parser.add_argument("-cp", "--checkpoint", type=str, default=None)
-    args = parser.parse_args()
-
-    main(args)
+    main()
