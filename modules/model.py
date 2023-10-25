@@ -1,8 +1,6 @@
 from typing import Dict
 import os
 
-from modules.scheduler import scheduler_with_warmup
-
 from torchmetrics.functional import accuracy
 import torch.optim as optim
 import torch.nn as nn
@@ -14,8 +12,6 @@ from rich import print
 
 
 class LitModel(LightningModule):
-    """PyTorch Lightning module"""
-
     def __init__(
             self, 
             model: nn.Module,
@@ -24,6 +20,16 @@ class LitModel(LightningModule):
             scheduler: optim.Optimizer = None,
             checkpoint: str = None
         ):
+        """
+        Initialize the Lightning Model.
+
+        Args:
+            model (nn.Module): The neural network model to be trained.
+            criterion (nn.Module, optional): The loss function. Default: None
+            optimizer (optim.Optimizer | Dict, optional): The optimizer or optimizer configuration. Default: None
+            scheduler (optim.Optimizer, optional): The learning rate scheduler. Default: None
+            checkpoint (str, optional): Path to a checkpoint file for model loading. Default: None
+        """
         super().__init__()
         self.model = model
         self.criterion = criterion
@@ -40,8 +46,6 @@ class LitModel(LightningModule):
     def configure_optimizers(self):
         if not self.scheduler:
             return self.optimizer
-        if isinstance(self.scheduler, dict):
-            self.scheduler = scheduler_with_warmup(**self.scheduler)
         if not isinstance(self.optimizer, list):
             self.optimizer = [self.optimizer]
         if not isinstance(self.scheduler, list):
@@ -95,7 +99,6 @@ class LitModel(LightningModule):
         print("[bold]Load checkpoint:[/] Done") if verbose else None
 
 
-    def save_hparams(self, config: Dict):
-        if isinstance(config, dict):
-            self.hparams.update(config)
+    def save_hparams(self, config: Dict) -> None:
+        self.hparams.update(config)
         self.save_hyperparameters()
