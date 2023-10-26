@@ -4,3 +4,4 @@ logs/*
 !logs/.gitkeep
 src/data/*
 !src/data/.gitkeep
+tests/
