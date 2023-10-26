@@ -3,7 +3,7 @@ import os, shutil
 from rich.progress import track
 
 
-
+# Data classes
 LABELS = {
     f"a{i}": action
     for i, action in enumerate(
@@ -19,7 +19,7 @@ LABELS = {
     )
 }
 
-
+# UTD data path
 DATA_PATH = "data/UTD-MAHD"
 
 

@@ -9,6 +9,7 @@ from modules.model import LitModel
 from modules.data import *
 from models import *
 
+from ultralytics import YOLO
 from lightning.pytorch import seed_everything
 import torch
 
@@ -24,25 +25,28 @@ traceback.install()
 
 # Set number of worker (CPU will be used | Default: 80%)
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-TRANSFORM = DataTransformation().DEFAULT
+TRANSFORM = DataTransformation().TOPIL
 VP = VideoProcessing(
-    sampling_value = 1,
-    max_frames = 0,
-    min_frames = 0,
+    sampling_value = 2,
+    max_frame = 0,
+    min_frame = 0,
+    add_border = False,
     size = (750, 750)
 )
 
 
 DATA_PATH = "data/UTD-MHAD"
-CLASESS = sorted(os.listdir(DATA_PATH))
+CLASESS = sorted(os.listdir("data/UCF101/test"))
 
 SHOW_VIDEO = True
-NUM_VIDEO = 20   # number of random video
-WAITKEY = 30    # millisecond before next frame
+NUM_VIDEO = 10   # number of random video
+WAITKEY = 100    # millisecond before next frame
 
-MODEL = ViT_v1(num_classes=len(CLASESS))
+EXTRACTOR = YOLO("yolov8x")
 
-CHECKPOINT = "logs/new/version_4/checkpoints/epoch=89-step=9090.ckpt"
+MODEL = ViT(version="B_32", num_classes=101)
+
+CHECKPOINT = "logs/new/ViT_B_32_ft_UCF101/checkpoints/epoch=5-step=8544.ckpt"
 
 
 
@@ -65,7 +69,14 @@ def main(args):
         total = []
         for frame in VP(path):
             with torch.inference_mode():
-                X = TRANSFORM(Image.fromarray(frame)).unsqueeze(0).to(DEVICE)
+                out = EXTRACTOR(frame, conf=0.25, iou=0.3, classes=0, verbose=False)[0]
+
+                x1, y1, x2, y2, conf, _ = (int(i.item()) for i in out.boxes[0].data[0])
+
+                human = frame[y1:y2, x1:x2]
+
+                X = TRANSFORM(human).unsqueeze(0).to(DEVICE)
+
                 outputs = lit_model(X)
                 _, pred = torch.max(outputs, 1)
 

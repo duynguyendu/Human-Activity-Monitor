@@ -25,7 +25,7 @@ class PrintTrainResult(cb.Callback):
 
 
 def custom_callbacks():
-    with open("./configs/callback.yaml", 'r') as file:
+    with open("./configs/callbacks.yaml", 'r') as file:
         cfg = yaml.safe_load(file)
     callbacks = []
     if cfg['verbose']:

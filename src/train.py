@@ -1,13 +1,4 @@
-from omegaconf import DictConfig, open_dict
-import hydra
 import shutil
-
-from modules.scheduler import scheduler_with_warmup
-from modules.callback import custom_callbacks
-from modules.model import LitModel
-from modules.data import *
-from modules.utils import *
-from models import *
 
 import torch.optim.lr_scheduler as ls
 import torch.optim as optim
@@ -16,12 +7,25 @@ import torch
 
 from pytorch_lightning.loggers import TensorBoardLogger
 from lightning.pytorch import seed_everything, Trainer
+
+import hydra
+from omegaconf import DictConfig, open_dict
 from rich import traceback
 traceback.install()
 
+# Setup root directory
+import rootutils
+rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=False)
+
+from modules.scheduler import scheduler_with_warmup
+from modules.callback import custom_callbacks
+from modules.model import LitModel
+from modules.data import *
+from models import *
 
 
-@hydra.main(config_path="configs", config_name="train", version_base="1.3")
+
+@hydra.main(config_path="../configs", config_name="train", version_base="1.3")
 def main(cfg: DictConfig) -> None:
     # Remove the hydra outputs since we already have lightning logs
     shutil.rmtree("outputs")
@@ -37,7 +41,7 @@ def main(cfg: DictConfig) -> None:
     DATASET = CustomDataModule(
         **cfg['data'],
         batch_size = cfg['trainer']['batch_size'],
-        num_workers = workers_handler(cfg['num_workers']) if torch.cuda.is_available() else 0
+        num_workers = cfg['num_workers'] if torch.cuda.is_available() else 0
     )
 
     # Define model

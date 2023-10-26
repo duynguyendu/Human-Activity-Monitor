@@ -1,0 +1,45 @@
+# Configuration for train.py
+
+
+# Data to be processed
+auto:
+  # Data path
+  data_path: src/data/UCF11
+
+  # Overwride if already existed
+  remake: true
+
+  # Save name (Optional)
+  save_name: null
+
+
+# -----------------------
+
+# Processer configuration
+processer:
+  # Save folder
+  save_folder: src/data
+
+  # Choose 1 frame every n frames
+  sampling_value: 4
+
+  # Change size of video
+  image_size: [224, 224]
+
+  # Train, val, test split size
+  train_val_test_split: [0.7, 0.15, 0.15]
+
+  # The maximum number of frames to retain
+  max_frame: 0
+
+  # The minimum number of frames required
+  min_frame: 0
+
+  # Whether to add borders to frames
+  add_border: false
+
+  # Number of cpu core to use 
+  num_workers: 0.6
+
+  # Whether to keep temporary files
+  keep_temp: False

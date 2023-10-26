@@ -1,18 +1,20 @@
-from multiprocessing import Pool
 from typing import List, Tuple
 from pathlib import Path
 import random
+import psutil
 import shutil
 import os
 
 from modules.transform import DataTransformation
 from modules.processing import VideoProcessing
+from modules.utils import workers_handler
 
 from torch.utils.data import DataLoader, ConcatDataset
 from torchvision.datasets import ImageFolder
 
 from lightning.pytorch import LightningDataModule
 
+from tqdm.contrib.concurrent import process_map
 from rich import print
 from PIL import Image
 import yaml
@@ -34,6 +36,7 @@ class DataProcessing:
             sampling_value: int = 0,
             max_frame: int = 0,
             min_frame: int = 0,
+            add_border: bool = False,
             num_workers: int = 0,
             keep_temp: bool = False,
         ) -> None:
@@ -53,9 +56,9 @@ class DataProcessing:
         self.save_folder = save_folder
         self.split_size = train_val_test_split
         self.keep_temp = keep_temp
-        self.workers = num_workers
+        self.workers = workers_handler(num_workers)
         self.extensions = ['.mp4', '.avi', '.mkv', '.mov', '.flv', '.mpg']
-        self.processer = VideoProcessing(sampling_value, max_frame, min_frame, image_size)
+        self.processer = VideoProcessing(sampling_value, max_frame, min_frame, add_border, image_size)
 
 
     def __call__(self, data_path: str, save_name: str=None, remake=False) -> None:
@@ -161,11 +164,12 @@ class DataProcessing:
                 "\n"
             )
             yaml.dump({
-                "train_val_test_split": self.split_size,
+                "train_val_test_split": tuple(self.split_size),
                 "sampling_value": self.processer.sampling_value,
                 "max_frame": self.processer.max_frame,
                 "min_frame": self.processer.min_frame,
-                "image_size": self.processer.size,
+                "add_border": self.processer.border,
+                "image_size": tuple(self.processer.size),
             }, config, default_flow_style=False)
 
 
@@ -196,27 +200,34 @@ class DataProcessing:
 
         # Process if save path is not existed or remake
         if not os.path.exists(self.save_path) or remake:
+            print(f"\n[bold]Summary:[/]")
+            print(f"  [bold]Number of workers:[/] {self.workers}")
+            print(f"  [bold]Data path[/]: [green]{self.data_path}[/]")
+            print(f"  [bold]Save path:[/] [green]{self.save_path}[/]")
+
+            # Calcute chunksize base on cpu parallel power
+            benchmark = lambda x: max(1, round(len(x) / (self.workers * psutil.cpu_freq().max / 1000) / 4))
+
             # Split data
-            print("[bold]Processing data:[/] Splitting data... ", end="\r")
+            print("\n[bold][yellow]Splitting data...[/][/]")
             class_folders = os.listdir(self.data_path)
-            with Pool(self.workers) as pool:
-                pool.map(self._split_data, class_folders)
+            process_map(self._split_data, class_folders, max_workers=self.workers, chunksize=benchmark(class_folders))
 
             # Generate data
-            print("[bold]Processing data:[/] Generating data...", end="\r")
+            print("\n[bold][yellow]Generating data...[/][/]")
             video_paths = [str(video) for ext in self.extensions for video in Path(self.temp_path).rglob("*" + ext)]
-            with Pool(self.workers) as pool:
-                pool.map(self._frame_generate, video_paths)
+            process_map(self._frame_generate, video_paths, max_workers=self.workers, chunksize=benchmark(video_paths))
 
             # Save configuration
+            print("\n[bold][yellow]Saving config...[/][/]")
             self._save_config(os.path.join(self.save_path, "config.yaml"))
 
             # Remove temp folder
             shutil.rmtree(self.temp_path) if not self.keep_temp else None
-            print("[bold]Processing data:[/] Done              ")
+            print("\n[bold][green]Processing data complete.[/][/]")
 
         else:
-            print("[bold]Processing data:[/] Existed")
+            print("[bold]Processing data is already existed.[/]")
 
 
 
@@ -243,7 +254,7 @@ class CustomDataModule(LightningDataModule):
         """
         super().__init__()
         self.data_path = data_path
-        self.workers = num_workers
+        self.workers = workers_handler(num_workers)
         self.augment_level = augment_level
         self.transform = DataTransformation(image_size)
         self.loader_config = {
