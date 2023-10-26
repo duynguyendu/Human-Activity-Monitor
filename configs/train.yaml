@@ -9,7 +9,7 @@ num_workers: 0.6
 
 # Config dataset
 data:
-  data_path: data/UTD-MHAD_x
+  data_path: src/data/UTD-MHAD_x
   augment_level: 0
   image_size: [224, 224]
 
