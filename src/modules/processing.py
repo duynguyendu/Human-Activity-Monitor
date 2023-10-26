@@ -164,10 +164,12 @@ class VideoProcessing:
         """
         if isinstance(size, int):
             size = (size, size)
-        elif isinstance(size, (tuple, list)) and len(size) == 2:
-            size = tuple(size)
         else:
-            raise TypeError(f"The 'size' parameter must be an int and > 0 or tuple or list with length == 2")
+            try:
+                size = tuple(size)
+                assert len(size) == 2, f"The lenght of 'size' parameter must be equal to 2. Got {len(size)} instead."
+            except:
+                raise TypeError(f"The 'size' parameter must be an int or tuple or list. Got {type(size)} instead.")
         return np.array([cv2.resize(frame, size) for frame in video])
 
 

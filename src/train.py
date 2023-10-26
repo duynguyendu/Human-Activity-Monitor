@@ -15,13 +15,12 @@ traceback.install()
 
 # Setup root directory
 import rootutils
-root = rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=False)
+rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=False)
 
 from modules.scheduler import scheduler_with_warmup
 from modules.callback import custom_callbacks
 from modules.model import LitModel
 from modules.data import *
-from modules.utils import *
 from models import *
 
 
@@ -42,7 +41,7 @@ def main(cfg: DictConfig) -> None:
     DATASET = CustomDataModule(
         **cfg['data'],
         batch_size = cfg['trainer']['batch_size'],
-        num_workers = workers_handler(cfg['num_workers']) if torch.cuda.is_available() else 0
+        num_workers = cfg['num_workers'] if torch.cuda.is_available() else 0
     )
 
     # Define model
