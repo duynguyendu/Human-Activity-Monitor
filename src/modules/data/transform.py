@@ -5,6 +5,10 @@ import torchvision.transforms as T
 from torch import Tensor
 
 
+__all__ = [
+    "DataTransformation"
+]
+
 
 class DataTransformation:
     def __init__(self, image_size: Tuple|list = (224, 224)) -> None:

@@ -1,6 +1,8 @@
 import os, shutil
-
 from rich.progress import track
+from rootutils import autosetup
+autosetup()
+
 
 
 # Data classes

@@ -2,5 +2,9 @@
 *.pyc
 logs/*
 !logs/.gitkeep
-src/data/*
-!src/data/.gitkeep
+data/*
+!data/.gitkeep
+!src/modules/data/
+weights/*
+!weights/.gitkeep
+tests/*
