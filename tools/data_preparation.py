@@ -1,6 +1,11 @@
-from modules.data import DataProcessing
 import shutil
 import hydra
+
+# Setup root
+import os, sys
+sys.path.extend([os.getcwd(), f"{os.getcwd()}/src"])
+
+from src.modules.data import DataProcessing
 
 
 
