@@ -14,13 +14,13 @@ from rich import traceback
 traceback.install()
 
 # Setup root directory
-import rootutils
-rootutils.setup_root(__file__, dotenv=True, pythonpath=True, cwd=False)
+from rootutils import autosetup
+autosetup()
 
 from modules.scheduler import scheduler_with_warmup
+from modules.data.module import CustomDataModule
 from modules.callback import custom_callbacks
 from modules.model import LitModel
-from modules.data import *
 from models import *
 
 
