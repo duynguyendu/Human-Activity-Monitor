@@ -5,6 +5,8 @@ __all__ = [
     "workers_handler"
 ]
 
+
+
 def workers_handler(value: int | float) -> int:
     """
     Calculate the number of workers based on an input value.
