@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import List, Tuple, Union
 from pathlib import Path
 import random
 import psutil
@@ -12,141 +12,35 @@ import numpy as np
 import yaml
 import cv2
 
-from ..utils import workers_handler
+from ..utils import workers_handler, tuple_handler
 
 
 __all__ = [
     "DataProcessing",
-    "VideoProcessing"
+    "VideoProcessing",
+    "ImageProcessing"
 ]
 
 
 
-class VideoProcessing:
-    """
-    Process included:
-
-    1. load: Load video and return list of frames.
-    2. Sampling: Choose 1 frame every n frames.
-    3. Truncating: Equally trim both head and tail if video length > max_frame.
-    4. Padding: Pad black frame to end of video if video length < min_frame.
-    5. Add border: Adds a border around a given video frame to make it a square frame.
-    6. Resize: Change size of a video.
-
-    - Auto: Auto apply: Load -> Sampling -> Truncating -> Padding -> Add border -> Resize
-    """
-    def __init__(
-            self,
-            sampling_value: int = 0,
-            max_frame: int = 0,
-            min_frame: int = 0,
-            add_border: bool = False,
-            size: Tuple[int, int] = 0
-        ) -> None:
+class ImageProcessing:
+    @staticmethod
+    def resize(image: np.ndarray, size: Union[int, List[int], Tuple[int]]) -> np.ndarray:
         """
-        Initialize the video processing operations.
+        Resize image to the specified dimensions.
 
         Args:
-            sampling_value (int, optional): The sampling value for frame selection. Default: 0
-            max_frame (int, optional): The maximum number of frames to retain. Default: 0
-            min_frame (int, optional): The minimum number of frames required. Default: 0
-            add_border (bool, optional): Whether to add borders to frames. Default: False
-            size (Tuple[int, int], optional): The target size for resizing frames. Default: 0
-        """
-        self.sampling_value = sampling_value
-        self.max_frame = max_frame
-        self.min_frame = min_frame
-        self.border = add_border
-        self.size = size
-
-
-    def __call__(self, path: str) -> np.ndarray:
-        """
-        Auto apply: Load -> Sampling -> Truncating -> Padding -> Add border -> Resize
-
-        Args:
-            path (np.ndarray): Path of video to be processed.
+            image (np.ndarray): Input image as a NumPy array.
+            size (Union[int, List[int], Tuple[int]]): A tuple specifying the target size (width, height).
 
         Returns:
-            np.ndarray: A NumPy array representing the processed video.
+            np.ndarray: A NumPy array representing the resized image.
         """
-        return self.auto(path)
+        return cv2.resize(image, tuple_handler(size, 2))
 
 
-    def load(self, path: str) -> np.ndarray:
-        """
-        Load a video file and return it as a NumPy array.
-
-        Args:
-            path (str): The file path to the video.
-
-        Returns:
-            np.ndarray: A NumPy array representing the video frames.
-
-        Raises:
-            - FileExistsError: If the specified file does not exist.
-            - RuntimeError: If the video file cannot be opened.
-        """
-        if not os.path.exists(path):
-            raise FileExistsError("File not found!")
-        video = cv2.VideoCapture(path)
-        if not video.isOpened():
-            raise RuntimeError("Could not open video file.")
-        output = np.array([
-            cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for _, frame in iter(video.read, (False, None))
-        ])
-        video.release()
-        return output
-
-
-    def sampling(self, video: np.ndarray, value: int) -> np.ndarray:
-        """
-        Perform frame sampling on a video.
-
-        Args:
-            video (np.ndarray): Input video as a NumPy array.
-            value (int): The sampling value. If 0, no sampling is performed.
-
-        Returns:
-            np.ndarray: A NumPy array representing the sampled video frames.
-        """
-        return video[::value] if value else video
-
-
-    def truncating(self, video: np.ndarray, max_frame: int) -> np.ndarray:
-        """
-        Truncate a video to a specified maximum number of frames.
-
-        Args:
-            video (np.ndarray): Input video as a NumPy array.
-            max_frame (int): The maximum number of frames to retain.
-
-        Returns:
-            np.ndarray: A NumPy array representing the truncated video frames.
-        """
-        middle_frame = len(video) // 2
-        m = max_frame // 2
-        r = max_frame % 2
-        return video[middle_frame - m : middle_frame + m + r]
-
-
-    def padding(self, video: np.ndarray, min_frame: int) -> np.ndarray:
-        """
-        Pad a video with black frames to meet a minimum frame length.
-
-        Args:
-            video (np.ndarray): Input video as a NumPy array.
-            min_frame (int): The desired minimum length of the video in frames.
-
-        Returns:
-            np.ndarray: A NumPy array representing the video after padding.
-        """
-        zeros_array = np.zeros((min_frame, *video.shape[1:]), dtype=np.uint8)
-        zeros_array[:len(video), ...] = video
-        return zeros_array
-
-
-    def add_border(self, video: np.ndarray, border_color: Tuple|int = (0, 0, 0)) -> np.ndarray:
+    @staticmethod
+    def add_border(image: np.ndarray, border_color: Tuple|int = (0, 0, 0)) -> np.ndarray:
         """
         Adds a border around a given video frame to make it a square frame.
 
@@ -157,66 +51,118 @@ class VideoProcessing:
         Returns:
             np.ndarray: A NumPy array representing the video after add border.
         """
-        img_h, img_w = video.shape[:2]
+        img_h, img_w = image.shape[:2]
         target_size = max(img_h, img_w)
 
         border_v = (target_size - img_h) // 2
         border_h = (target_size - img_w) // 2
 
-        border = lambda x: cv2.copyMakeBorder(x, border_v, border_v, border_h, border_h, cv2.BORDER_CONSTANT, border_color)
-        return np.array([border(frame) for frame in video])
+        return cv2.copyMakeBorder(image, border_v, border_v, border_h, border_h, cv2.BORDER_CONSTANT, border_color)
 
 
-    def resize(self, video: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
+
+class VideoProcessing:
+    """
+    Process included:
+
+    Load: Load video and return list of frames.
+    Sampling: Choose 1 frame every n frames.
+    Truncating: Equally trim both head and tail if video length > max_frame.
+    Padding: Pad black frame to end of video if video length < min_frame.
+    Resize: Change size of a video.
+    """
+    @staticmethod
+    def load(path: str) -> List[np.ndarray]:
         """
-        Resize each frame in a video to the specified dimensions.
+        Load a video file and return it as a NumPy array.
 
         Args:
-            video (np.ndarray): Input video as a NumPy array.
-            size (Tuple[int, int]): A tuple specifying the target size (width, height) for each frame.
+            path (str): The file path to the video.
 
         Returns:
-            np.ndarray: A NumPy array representing the resized video.
+            List[np.ndarray]: A NumPy array representing the video frames.
+
+        Raises:
+            - FileExistsError: If the specified file does not exist.
+            - RuntimeError: If the video file cannot be opened.
         """
-        if isinstance(size, int):
-            size = (size, size)
-        else:
-            try:
-                size = tuple(size)
-                assert len(size) == 2, f"The lenght of 'size' parameter must be equal to 2. Got {len(size)} instead."
-            except:
-                raise TypeError(f"The 'size' parameter must be an int or tuple or list. Got {type(size)} instead.")
-        return np.array([cv2.resize(frame, size) for frame in video])
+        # Check path
+        if not os.path.exists(path):
+            raise FileExistsError("File not found!")
+        # Load video
+        video = cv2.VideoCapture(path)
+        # Check video
+        if not video.isOpened():
+            raise RuntimeError("Could not open video file.")
+        # Extract frames
+        output = [cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for _, frame in iter(video.read, (False, None))]
+        video.release()
+        return output
 
 
-    def auto(self, path: str) -> np.ndarray:
+    @staticmethod
+    def sampling(video: Union[np.ndarray, List[np.ndarray]], value: int) -> List[np.ndarray]:
         """
-        Auto apply: Load -> Sampling -> Truncating -> Padding -> Add border -> Resize
+        Perform frame sampling on a video.
 
         Args:
-            path (np.ndarray): Path of video to be processed.
+            video (Union[np.ndarray, List[np.ndarray]]): Input video as a NumPy array.
+            value (int): The sampling value. If 0, no sampling is performed.
 
         Returns:
-            np.ndarray: A NumPy array representing the processed video.
+            List[np.ndarray]: A NumPy array representing the sampled video frames.
         """
-        # Load
-        video = self.load(path)
-        # Sampling
-        if self.sampling_value > 0:
-            video = self.sampling(video, self.sampling_value)
-        # Truncating
-        if self.max_frame > 0:
-            video = self.truncating(video, self.max_frame)
-        # Padding
-        if self.min_frame > 0:
-            video = self.padding(video, self.min_frame)
-        # Add border
-        if self.border:
-            video = self.add_border(video)
-        # Resize
-        if self.size:
-            video = self.resize(video, self.size)
-        return video
+        return video[::value]
+
+
+    @staticmethod
+    def truncating(video: Union[np.ndarray, List[np.ndarray]], max_frame: int) -> List[np.ndarray]:
+        """
+        Truncate a video to a specified maximum number of frames.
+
+        Args:
+            video (Union[np.ndarray, List[np.ndarray]]): Input video as a NumPy array.
+            max_frame (int): The maximum number of frames to retain.
+
+        Returns:
+            List[np.ndarray]: A NumPy array representing the truncated video frames.
+        """
+        middle_frame = len(video) // 2
+        m = max_frame // 2
+        r = max_frame % 2
+        return video[middle_frame - m : middle_frame + m + r]
+
+
+    @staticmethod
+    def padding(video: Union[np.ndarray, List[np.ndarray]], min_frame: int) -> List[np.ndarray]:
+        """
+        Pad a video with black frames to meet a minimum frame length.
+
+        Args:
+            video (Union[np.ndarray, List[np.ndarray]]): Input video as a NumPy array.
+            min_frame (int): The desired minimum length of the video in frames.
+
+        Returns:
+            List[np.ndarray]: A NumPy array representing the video after padding.
+        """
+        zeros_array = np.zeros((min_frame, *np.array(video).shape[1:]), dtype=np.uint8)
+        zeros_array[:len(video), ...] = video
+        return zeros_array
+
+
+    @staticmethod
+    def resize(video: Union[np.ndarray, List[np.ndarray]], size: Union[int, List[int], Tuple[int]]) -> List[np.ndarray]:
+        """
+        Resize each frame of video to the specified dimensions.
+
+        Args:
+            video (Union[np.ndarray, List[np.ndarray]]): Input video as a NumPy array.
+            size (Union[int, List[int], Tuple[int]]): A tuple specifying the target size (width, height).
+
+        Returns:
+            List[np.ndarray]: A NumPy array representing the resized video.
+        """
+        return [cv2.resize(frame, tuple_handler(size, 2)) for frame in video]
 
 
 
@@ -229,7 +175,6 @@ class DataProcessing:
             sampling_value: int = 0,
             max_frame: int = 0,
             min_frame: int = 0,
-            add_border: bool = False,
             num_workers: int = 0,
             keep_temp: bool = False,
         ) -> None:
@@ -248,10 +193,13 @@ class DataProcessing:
         """
         self.save_folder = save_folder
         self.split_size = train_val_test_split
+        self.size = image_size
+        self.sampling = sampling_value
+        self.max_frame = max_frame
+        self.min_frame = min_frame
         self.keep_temp = keep_temp
         self.workers = workers_handler(num_workers)
         self.extensions = ['.mp4', '.avi', '.mkv', '.mov', '.flv', '.mpg']
-        self.processer = VideoProcessing(sampling_value, max_frame, min_frame, add_border, image_size)
 
 
     def __call__(self, data_path: str, save_name: str=None, remake=False) -> None:
@@ -267,37 +215,6 @@ class DataProcessing:
             None
         """
         return self.auto(data_path, save_name, remake)
-
-
-    def _frame_generate(self, path: str) -> None:
-        """
-        Generate and save individual frames from a video file.
-
-        Args:
-            path (str): The path to the video file.
-
-        Returns:
-            None
-        """
-
-        # Get file name
-        file_name = path.split("/")[-1][:-4]
-
-        # Make destination path
-        dst_path = "/".join(path.replace(self.temp_path, self.save_path).split("/")[:-1])
-
-        # Create it if not existed
-        os.makedirs(dst_path, exist_ok=True)
-
-        # Process the video, return list of frames
-        video = self.processer(path)
-
-        # Save each frame to the destination
-        for i, frame in enumerate(video):
-            save_path = os.path.join(dst_path, f"{file_name}_{i}.jpg")
-            if not os.path.exists(save_path):
-                img = Image.fromarray(frame)
-                img.save(save_path)
 
 
     def _split_data(self, class_folder: str) -> None:
@@ -338,6 +255,59 @@ class DataProcessing:
                     shutil.copyfile(video_path, dst_path)
 
 
+    def __process_video(self, path: str) -> List[np.ndarray]:
+        """
+        Auto process the video.
+
+        Args:
+            path (str): Path to video to be processed.
+
+        Returns:
+            List[np.ndarray]: List of frames of the video.
+        """
+        video = VideoProcessing.load(path)
+        if self.sampling:
+            video = VideoProcessing.sampling(np.array(video), self.sampling)
+        if self.max_frame:
+            video = VideoProcessing.truncating(np.array(video), self.max_frame)
+        if self.min_frame:
+            video = VideoProcessing.padding(np.array(video), self.min_frame)
+        if self.size:
+            video = VideoProcessing.resize(np.array(video), self.size)
+        return video
+
+
+    def _frame_generate(self, path: str) -> None:
+        """
+        Generate and save individual frames from a video file.
+
+        Args:
+            path (str): The path to the video file.
+
+        Returns:
+            None
+        """
+
+        # Get file name
+        file_name = path.split("/")[-1][:-4]
+
+        # Make destination path
+        dst_path = "/".join(path.replace(self.temp_path, self.save_path).split("/")[:-1])
+
+        # Create it if not existed
+        os.makedirs(dst_path, exist_ok=True)
+
+        # Process the video
+        video = self.__process_video(path)
+
+        # Save each frame to the destination
+        for i, frame in enumerate(video):
+            save_path = os.path.join(dst_path, f"{file_name}_{i}.jpg")
+            if not os.path.exists(save_path):
+                img = Image.fromarray(frame)
+                img.save(save_path)
+
+
     def _save_config(self, path: str) -> None:
         """
         Save data processed information
@@ -358,11 +328,10 @@ class DataProcessing:
             )
             yaml.dump({
                 "train_val_test_split": tuple(self.split_size),
-                "sampling_value": self.processer.sampling_value,
-                "max_frame": self.processer.max_frame,
-                "min_frame": self.processer.min_frame,
-                "add_border": self.processer.border,
-                "image_size": tuple(self.processer.size),
+                "sampling_value": self.sampling,
+                "max_frame": self.max_frame,
+                "min_frame": self.min_frame,
+                "image_size": tuple(self.size),
             }, config, default_flow_style=False)
 
 
@@ -394,9 +363,9 @@ class DataProcessing:
         # Process if save path is not existed or remake
         if not os.path.exists(self.save_path) or remake:
             print(f"\n[bold]Summary:[/]")
-            print(f"  [bold]Number of workers:[/] {self.workers}")
-            print(f"  [bold]Data path[/]: [green]{self.data_path}[/]")
-            print(f"  [bold]Save path:[/] [green]{self.save_path}[/]")
+            print(f"  Number of workers: {self.workers}")
+            print(f"  Data path: [green]{self.data_path}[/]")
+            print(f"  Save path: [green]{self.save_path}[/]")
 
             # Calcute chunksize base on cpu parallel power
             benchmark = lambda x: max(1, round(len(x) / (self.workers * psutil.cpu_freq().max / 1000) / 4))

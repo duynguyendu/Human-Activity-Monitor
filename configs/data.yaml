@@ -4,7 +4,7 @@
 # Data to be processed
 auto:
   # Data path
-  data_path: src/data/UCF11
+  data_path: data/processed/UTD-MHAD
 
   # Overwride if already existed
   remake: true
@@ -18,7 +18,7 @@ auto:
 # Processer configuration
 processer:
   # Save folder
-  save_folder: src/data
+  save_folder: data/processed
 
   # Choose 1 frame every n frames
   sampling_value: 4
@@ -34,9 +34,6 @@ processer:
 
   # The minimum number of frames required
   min_frame: 0
-
-  # Whether to add borders to frames
-  add_border: false
 
   # Number of cpu core to use 
   num_workers: 0.6
