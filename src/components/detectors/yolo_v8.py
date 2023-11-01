@@ -9,31 +9,26 @@ from modules.data import ImageProcessing
 from modules.utils import tuple_handler
 
 
-
 class YoloV8:
     def __init__(
-            self,
-            confident: float = 0.25,
-            iou: float = 0.3,
-            size: Tuple = (224, 224),
-            add_border: bool = True,
-            device: str = 'auto'
-        ):
-        if device == 'auto':
-            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self,
+        weight: str = None,
+        conf: float = 0.25,
+        iou: float = 0.3,
+        size: Tuple = (224, 224),
+        add_border: bool = True,
+        device: str = "auto",
+    ):
+        if device == "auto":
+            device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
-        self.size = tuple_handler(size, 2)
+        self.size = tuple_handler(size, max_dim=2)
         self.border = add_border
-        self.model = YOLO('weights/yolov8x.pt').to(self.device)
-        self.config = {
-            "conf": confident,
-            "iou": iou
-        }
-
+        self.model = YOLO(weight if weight else "weights/yolov8x.pt").to(self.device)
+        self.config = {"conf": conf, "iou": iou}
 
     def __call__(self, X: torch.Tensor) -> str:
         return self.predict(X)
-
 
     def predict(self, X: torch.Tensor) -> str:
         result = self.model.predict(X, **self.config, classes=0, verbose=False)[0]
@@ -50,6 +45,6 @@ class YoloV8:
 
                 human = cv2.resize(human, self.size)
 
-                outputs.append(human)
+                outputs.append({"box": (x1, y1, x2, y2), "human": human})
 
         return outputs
