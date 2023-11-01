@@ -1,12 +1,18 @@
-from .processing import ImageProcessing, VideoProcessing, DataProcessing
 from .transform import DataTransformation
 from .module import CustomDataModule
+from .processing import (
+    ImageProcessing,
+    VideoProcessing,
+    ImagePreparation,
+    VideoPreparation,
+)
 
 
 __all__ = [
     "ImageProcessing",
     "VideoProcessing",
-    "DataProcessing",
+    "ImagePreparation",
+    "VideoPreparation",
     "DataTransformation",
-    "CustomDataModule"
+    "CustomDataModule",
 ]
