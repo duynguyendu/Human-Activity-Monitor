@@ -5,10 +5,10 @@ import cv2
 
 # Setup root
 import os, sys
+
 sys.path.extend([os.getcwd(), f"{os.getcwd()}/src"])
 
 from src.components.detectors.yolo_v8 import YoloV8
-
 
 
 def ssim(image_1, image_2):
@@ -18,20 +18,15 @@ def ssim(image_1, image_2):
 
 
 def main():
-
     PATH = "/media/ht0710/Run/Data/Custom"
 
-    THRESHOLD = 0.8
+    THRESHOLD = 0.3
+
+    SAMPLING = 5
 
     SAVE_PATH = f"data/processed/{THRESHOLD}"
 
-    MODEL = YoloV8(
-        confident = 0.25,
-        iou = 0.3,
-        add_border = True,
-        size = 224,
-        device = "auto"
-    )
+    MODEL = YoloV8(conf=0.25, iou=0.3)
 
     data = os.listdir(PATH)
 
@@ -39,38 +34,45 @@ def main():
         video_path = os.path.join(PATH, name)
         save_path = os.path.join(SAVE_PATH, name[:-4])
 
+        if os.path.exists(save_path):
+            continue
+
         os.makedirs(save_path, exist_ok=True)
 
-        # Open video
         video = cv2.VideoCapture(video_path)
 
         total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        progress_bar = tqdm(total=total_frames, desc=f"{name} | {k}/{len(data)}", unit="iteration")
+        progress_bar = tqdm(
+            total=total_frames,
+            desc=f"{name} | {k}/{len(data)}",
+            miniters=1,
+            smoothing=0.1,
+        )
 
         prev_run = []
         for i, (_, frame) in enumerate(iter(video.read, (False, None))):
-            outputs = MODEL(frame)
+            if i % SAMPLING == 0:
+                outputs = MODEL(frame)
 
-            for j, human in enumerate(outputs, 1):
-                if prev_run:
-                    scores = set(ssim(prev, human) for prev in prev_run)
-                    best = max(scores)
+                for j, output in enumerate(outputs, 1):
+                    if prev_run:
+                        scores = set(
+                            ssim(prev["human"], output["human"]) for prev in prev_run
+                        )
+                        best = max(scores)
 
-                    prev_run.pop(np.argmax(best))
+                        prev_run.pop(np.argmax(best))
 
-                    if best > THRESHOLD:
-                        continue
+                        if best > THRESHOLD:
+                            continue
 
-                cv2.imwrite(f"{save_path}/{i}_{j}.jpg", human)
+                    cv2.imwrite(f"{save_path}/{i}_{j}.jpg", output["human"])
 
-            prev_run = outputs
+                prev_run = outputs
 
             progress_bar.update(1)
 
-        progress_bar.close()
 
-
-
-if __name__=="__main__":
+if __name__ == "__main__":
     main()
