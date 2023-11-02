@@ -2,3 +2,26 @@
 
 
 path: ...
+
+sampling: 5
+
+delay: 1
+
+image_size: 224
+
+device: "auto"
+
+detector:
+  weight: "weights/yolov8m.pt"
+  conf: 0.25
+  iou: 0.3
+  add_border: True
+
+classifier:
+  checkpoint: "logs/new/custom/checkpoints/epoch=23-step=1344.ckpt"
+
+utils:
+  heatmap:
+    grow: 2
+    blur: 1.0
+    alpha: 0.5

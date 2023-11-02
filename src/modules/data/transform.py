@@ -10,34 +10,34 @@ __all__ = ["DataTransformation"]
 
 
 class DataTransformation:
-    """Contains Transformation for image"""
+    """Contains Transformation methods for image"""
 
-    @property
-    def DEFAULT(self, image_size: Tuple | list = (224, 224)) -> Tensor:
+    @staticmethod
+    def DEFAULT(image_size: Tuple | list | int = (224, 224)) -> Tensor:
         """
         Apply a default set of image transformations to the input image.
 
         Args:
-            image_size (Tuple, optional): The desired size of the output image. Defaults to (224, 224).
+            image_size (Tuple | list | int, optional): The desired size of the output image. Defaults to (224, 224).
 
         Returns:
             Tensor: The transformed image as a PyTorch tensor.
         """
         return T.Compose(
             [
-                T.Resize(tuple_handler(image_size), antialias=True),
+                T.Resize(tuple_handler(image_size, max_dim=2), antialias=True),
                 T.ToTensor(),
                 T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
 
-    @property
-    def TOPIL(self, image_size: Tuple | list = (224, 224)) -> Tensor:
+    @staticmethod
+    def TOPIL(image_size: Tuple | list | int = (224, 224)) -> Tensor:
         """
         Convert a PyTorch tensor to a PIL image and apply a series of image transformations.
 
         Args:
-            image_size (Tuple, optional): The desired size of the output image. Defaults to (224, 224).
+            image_size (Tuple | list | int, optional): The desired size of the output image. Defaults to (224, 224).
 
         Returns:
             Tensor: The transformed image as a PyTorch tensor.
@@ -45,41 +45,49 @@ class DataTransformation:
         return T.Compose(
             [
                 T.ToPILImage(),
-                T.Resize(tuple_handler(image_size), antialias=True),
+                T.Resize(tuple_handler(image_size, max_dim=2), antialias=True),
                 T.ToTensor(),
                 T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
 
-    @property
-    def AUGMENT_LV0(self, image_size: Tuple | list = (224, 224)) -> Tensor:
+    @staticmethod
+    def AUGMENT_LV0(image_size: Tuple | list | int = (224, 224)) -> Tensor:
         """Femboy 🫵
 
         Apply a default set of image transformations to the input image.
 
         Args:
-            image_size (Tuple, optional): The desired size of the output image. Defaults to (224, 224).
-
-        Returns:
-            Tensor: The transformed image as a PyTorch tensor.
-        """
-        return self.DEFAULT
-
-    @property
-    def AUGMENT_LV1(self, image_size: Tuple | list = (224, 224)) -> Tensor:
-        """Survivor 🌟
-
-        Apply a common set of image transformations to the input image.
-
-        Args:
-            image_size (Tuple, optional): The desired size of the output image. Defaults to (224, 224).
+            image_size (Tuple | list | int, optional): The desired size of the output image. Defaults to (224, 224).
 
         Returns:
             Tensor: The transformed image as a PyTorch tensor.
         """
         return T.Compose(
             [
-                T.RandomResizedCrop(tuple_handler(image_size), antialias=True),
+                T.Resize(tuple_handler(image_size, max_dim=2), antialias=True),
+                T.ToTensor(),
+                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
+
+    @staticmethod
+    def AUGMENT_LV1(image_size: Tuple | list | int = (224, 224)) -> Tensor:
+        """Survivor 🌟
+
+        Apply a common set of image transformations to the input image.
+
+        Args:
+            image_size (Tuple | list | int, optional): The desired size of the output image. Defaults to (224, 224).
+
+        Returns:
+            Tensor: The transformed image as a PyTorch tensor.
+        """
+        return T.Compose(
+            [
+                T.RandomResizedCrop(
+                    tuple_handler(image_size, max_dim=2), antialias=True
+                ),
                 T.RandomHorizontalFlip(p=0.1),
                 T.RandomRotation(15),
                 T.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05),
@@ -88,21 +96,23 @@ class DataTransformation:
             ]
         )
 
-    @property
-    def AUGMENT_LV2(self, image_size: Tuple | list = (224, 224)) -> Tensor:
+    @staticmethod
+    def AUGMENT_LV2(image_size: Tuple | list | int = (224, 224)) -> Tensor:
         """Trooper 🔫
 
         Apply a medium set of image transformations to the input image.
 
         Args:
-            image_size (Tuple, optional): The desired size of the output image. Defaults to (224, 224).
+            image_size (Tuple | list | int, optional): The desired size of the output image. Defaults to (224, 224).
 
         Returns:
             Tensor: The transformed image as a PyTorch tensor.
         """
         return T.Compose(
             [
-                T.RandomResizedCrop(tuple_handler(image_size), antialias=True),
+                T.RandomResizedCrop(
+                    tuple_handler(image_size, max_dim=2), antialias=True
+                ),
                 T.RandomHorizontalFlip(p=0.2),
                 T.RandomRotation(30),
                 T.GaussianBlur(3),
@@ -117,21 +127,23 @@ class DataTransformation:
             ]
         )
 
-    @property
-    def AUGMENT_LV3(self, image_size: Tuple | list = (224, 224)) -> Tensor:
+    @staticmethod
+    def AUGMENT_LV3(image_size: Tuple | list | int = (224, 224)) -> Tensor:
         """Veterant 🚀
 
         Apply a big set of image transformations to the input image.
 
         Args:
-            image_size (Tuple, optional): The desired size of the output image. Defaults to (224, 224).
+            image_size (Tuple | list | int, optional): The desired size of the output image. Defaults to (224, 224).
 
         Returns:
             Tensor: The transformed image as a PyTorch tensor.
         """
         return T.Compose(
             [
-                T.RandomResizedCrop(tuple_handler(image_size), antialias=True),
+                T.RandomResizedCrop(
+                    tuple_handler(image_size, max_dim=2), antialias=True
+                ),
                 T.RandomHorizontalFlip(p=0.35),
                 T.RandomRotation(60),
                 T.GaussianBlur(5),
@@ -146,21 +158,23 @@ class DataTransformation:
             ]
         )
 
-    @property
-    def AUGMENT_LV4(self, image_size: Tuple | list = (224, 224)) -> Tensor:
+    @staticmethod
+    def AUGMENT_LV4(image_size: Tuple | list | int = (224, 224)) -> Tensor:
         """Hellraiser 🗿
 
         Apply a huge set of image transformations to the input image.
 
         Args:
-            image_size (Tuple, optional): The desired size of the output image. Defaults to (224, 224).
+            image_size (Tuple | list | int, optional): The desired size of the output image. Defaults to (224, 224).
 
         Returns:
             Tensor: The transformed image as a PyTorch tensor.
         """
         return T.Compose(
             [
-                T.RandomResizedCrop(tuple_handler(image_size), antialias=True),
+                T.RandomResizedCrop(
+                    tuple_handler(image_size, max_dim=2), antialias=True
+                ),
                 T.RandomHorizontalFlip(p=0.5),
                 T.RandomRotation(90),
                 T.GaussianBlur(7),
@@ -177,21 +191,23 @@ class DataTransformation:
             ]
         )
 
-    @property
-    def AUGMENT_LV5(self, image_size: Tuple | list = (224, 224)) -> Tensor:
+    @staticmethod
+    def AUGMENT_LV5(image_size: Tuple | list | int = (224, 224)) -> Tensor:
         """Doom Slayer 💀
 
         Apply a massive set of image transformations to the input image.
 
         Args:
-            image_size (Tuple, optional): The desired size of the output image. Defaults to (224, 224).
+            image_size (Tuple | list | int, optional): The desired size of the output image. Defaults to (224, 224).
 
         Returns:
             Tensor: The transformed image as a PyTorch tensor.
         """
         return T.Compose(
             [
-                T.RandomResizedCrop(tuple_handler(image_size), antialias=True),
+                T.RandomResizedCrop(
+                    tuple_handler(image_size, max_dim=2), antialias=True
+                ),
                 T.RandomHorizontalFlip(p=0.69),
                 T.RandomRotation(96),
                 T.GaussianBlur(9.6),
