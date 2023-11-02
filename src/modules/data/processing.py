@@ -298,7 +298,9 @@ class ImagePreparation:
                 default_flow_style=False,
             )
 
-    def auto(self, data_path: str, save_name: str = False, remake=False) -> None:
+    def auto(
+        self, data_path: str, save_name: str = False, remake: bool = False
+    ) -> None:
         """
         Automatically process data and save it to the specified location.
 
@@ -328,9 +330,14 @@ class ImagePreparation:
             ),
         )
 
-        # Process if save path is not existed or remake
+        # Process if save path is not existed
         if not os.path.exists(self.save_path) or remake:
+            # Delete the old one if remake
+            shutil.rmtree(self.save_path) if remake else None
+
+            # Process summary
             print(f"\n[bold]Summary:[/]")
+            print(f"  Remake: {remake}")
             print(f"  Number of workers: {self.workers}")
             print(f"  Data path: [green]{self.data_path}[/]")
             print(f"  Save path: [green]{self.save_path}[/]")
@@ -569,7 +576,12 @@ class VideoPreparation:
 
         # Process if save path is not existed or remake
         if not os.path.exists(self.save_path) or remake:
+            # Delete the old one if remake
+            shutil.rmtree(self.save_path) if remake else None
+
+            # Process summary
             print(f"\n[bold]Summary:[/]")
+            print(f"  Remake: {remake}")
             print(f"  Number of workers: {self.workers}")
             print(f"  Data path: [green]{self.data_path}[/]")
             print(f"  Save path: [green]{self.save_path}[/]")
