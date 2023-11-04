@@ -1,27 +1,51 @@
 # Configuration for run.py
 
 
+# Path to video
 path: ...
 
-sampling: 5
+# Choose 1 frame every n step
+sampling: 1
 
+# Frame delay (ms)
 delay: 1
 
+# Human image process size
 image_size: 224
 
+# GPU or CPU
 device: "auto"
 
+# Feature to activate
+enable:
+  detector: true
+  classifier: false
+  person_count: true
+  heatmap: true
+
+# Human detection
 detector:
-  weight: "weights/yolov8m.pt"
+  weight: "weights/yolov8x.pt"
   conf: 0.25
   iou: 0.3
   add_border: True
 
+# Human activity classification
 classifier:
   checkpoint: "logs/new/custom/checkpoints/epoch=23-step=1344.ckpt"
 
-utils:
+# Feature options
+feature:
+  # Human bounding box
+  human_box: True
+
+  # Count total person
+  person_count:
+    smoothness: 10
+
+  # Heatmap
   heatmap:
-    grow: 2
-    blur: 1.0
-    alpha: 0.5
+    grow: 3
+    decay: 1
+    blur: 0.8
+    alpha: 0.8

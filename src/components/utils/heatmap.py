@@ -6,51 +6,93 @@ from src.modules.utils import tuple_handler
 
 
 class Heatmap:
-    def __init__(self, blurriness: float = 1.0, alpha: float = 0.5) -> None:
+    LAYER = None
+
+    @staticmethod
+    def new_layer_from_shape(shape: Tuple) -> np.ndarray:
         """
-        Heatmap initialize
+        Create an empty layer from the given shape
 
         Args:
-            blurriness (float, optional): the blurriness of the heat layer. Defaults to 1.0.
-            alpha (float, optional): Opacity of the heat layer. Defaults to 0.5.
-        """
-        self.layer = None
-        self.blurriness = int(
-            100 * blurriness + 1 if 100 * blurriness % 2 == 0 else 100 * blurriness
-        )
-        self.alpha = alpha
+            shape (Tuple): (height, width) of the layer
 
-    def update(self, area: Tuple, value) -> None:
+        Returns:
+            np.ndarray: new empty layer be created
+        """
+        return np.zeros(tuple_handler(shape, max_dim=2), dtype=np.uint8)
+
+    @staticmethod
+    def new_layer_from_image(image: np.ndarray) -> np.ndarray:
+        """
+        Create an empty layer from the given image
+
+        Args:
+            image (np.ndarray): original image to create new layer
+
+        Returns:
+            np.ndarray: new empty layer be created
+        """
+        return np.zeros_like(image, dtype=np.uint8)
+
+    @staticmethod
+    def update(area: Tuple, value: int) -> np.ndarray:
         """
         Update map layer
 
         Args:
             area (int): area to increase
-            value (_type_): _description_
-        """
-        x1, y1, x2, y2 = tuple_handler(area, max_dim=4)
-        self.layer[y1:y2, x1:x2] += value
-        self.layer = np.clip(self.layer, a_min=0, a_max=255 - value)
+            value (_type_): amount to update
+            blurriness (float, optional): the blurriness of the heat layer. Defaults to 1.0
 
-    def apply(self, image: np.ndarray):
+        Returns:
+            np.ndarray: layer after updated
+        """
+
+        # Grow
+        x1, y1, x2, y2 = tuple_handler(area, max_dim=4)
+        x1, y1 = int(x1 * 0.95), int(y1 * 0.95)
+        x2, y2 = int(x2 * 1.05), int(y2 * 1.05)
+        Heatmap.LAYER[y1:y2, x1:x2] = np.minimum(
+            Heatmap.LAYER[y1:y2, x1:x2] + value, 255 - value
+        )
+
+    @staticmethod
+    def decay(value: int = 1) -> None:
+        """
+        Reduce heatmap value
+
+        Args:
+            value (int): percentage to decrease
+        """
+        Heatmap.LAYER = ((1 - value / 100) * Heatmap.LAYER).astype("uint8")
+
+    @staticmethod
+    def apply(
+        image: np.ndarray,
+        blurriness: float = 1.0,
+        alpha: float = 0.5,
+    ) -> np.ndarray:
         """
         Apply heatmap
 
         Args:
             image (np.ndarray): image to apply heatmap
+            layer (np.ndarray): layer to apply heat
+            alpha (float, optional): Opacity of the heat layer. Defaults to 0.5
 
         Returns:
             np.ndarray: result image
         """
 
-        # Blur map
-        self.layer = cv2.GaussianBlur(
-            self.layer.astype("uint8"), (self.blurriness, self.blurriness), 0
-        )
+        # Blur
+        blurriness = int(blurriness * 100)
+        blurriness = blurriness + 1 if blurriness % 2 == 0 else blurriness
+        Heatmap.LAYER = cv2.stackBlur(Heatmap.LAYER, (blurriness, blurriness), 0)
 
-        # Apply heat
-        heatmap = cv2.applyColorMap(self.layer, cv2.COLORMAP_JET)
-        # Combined
-        cv2.addWeighted(heatmap, self.alpha, image, 1 - self.alpha, 0, image)
+        # Apply heat to layer
+        heatmap = cv2.applyColorMap(Heatmap.LAYER, cv2.COLORMAP_JET)
 
-        return image
+        # Combined image and heat layer
+        cv2.addWeighted(heatmap, alpha, image, 1 - alpha, 0, image)
+
+        return image, heatmap
