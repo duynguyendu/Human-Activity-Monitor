@@ -26,9 +26,9 @@ def main():
 
     SAVE_PATH = f"data/processed/{THRESHOLD}"
 
-    MODEL = YoloV8(conf=0.25, iou=0.3)
+    MODEL = YoloV8(weight="weights/yolov8x.pt", margin=30)
 
-    data = os.listdir(PATH)
+    data = sorted(os.listdir(PATH), key=lambda x: int(x.split("_")[0]))
 
     for k, name in enumerate(data, 1):
         video_path = os.path.join(PATH, name)
