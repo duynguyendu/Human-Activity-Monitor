@@ -2,11 +2,7 @@ from typing import Union, Tuple, List
 import os
 
 
-__all__ = [
-    "workers_handler",
-    "tuple_handler"
-]
-
+__all__ = ["workers_handler", "tuple_handler"]
 
 
 def workers_handler(value: Union[int, float]) -> int:
@@ -28,7 +24,9 @@ def workers_handler(value: Union[int, float]) -> int:
         case _:
             workers = 0
     if not (-1 < workers < max_workers):
-        raise ValueError(f"Number of workers is out of bounds. Min: 0 | Max: {max_workers}")
+        raise ValueError(
+            f"Number of workers is out of bounds. Min: 0 | Max: {max_workers}"
+        )
     return workers
 
 
@@ -53,7 +51,9 @@ def tuple_handler(value: Union[int, List[int], Tuple[int]], max_dim: int) -> Tup
 
     # Check max_dim
     if not isinstance(max_dim, int) and max_dim > 1:
-        raise TypeError(f"The 'max_dim' parameter must be an int. Got {type(max_dim)} instead.")
+        raise TypeError(
+            f"The 'max_dim' parameter must be an int. Got {type(max_dim)} instead."
+        )
     # Check value
     if isinstance(value, int):
         output = tuple([value] * max_dim)
@@ -61,7 +61,11 @@ def tuple_handler(value: Union[int, List[int], Tuple[int]], max_dim: int) -> Tup
         try:
             output = tuple(value)
         except:
-            raise TypeError(f"The 'value' parameter must be an int or tuple or list. Got {type(value)} instead.")
+            raise TypeError(
+                f"The 'value' parameter must be an int or tuple or list. Got {type(value)} instead."
+            )
     if len(output) != max_dim:
-        raise ValueError(f"The lenght of 'value' parameter must be equal to {max_dim}. Got {len(output)} instead.")
+        raise ValueError(
+            f"The lenght of 'value' parameter must be equal to {max_dim}. Got {len(output)} instead."
+        )
     return output

@@ -28,7 +28,10 @@ def main():
 
     MODEL = YoloV8(weight="weights/yolov8x.pt", margin=30)
 
-    data = sorted(os.listdir(PATH), key=lambda x: int(x.split("_")[0]))
+    data = sorted(
+        os.listdir(PATH),
+        key=lambda x: tuple(int(i) for i in x.split(".")[0].split("_")),
+    )
 
     for k, name in enumerate(data, 1):
         video_path = os.path.join(PATH, name)

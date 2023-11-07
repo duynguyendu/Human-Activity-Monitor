@@ -32,10 +32,13 @@ detector:
 
 # Human activity classification
 classifier:
-  checkpoint: "logs/new/custom/checkpoints/epoch=23-step=1344.ckpt"
+  checkpoint: "logs/epoch=23-step=1344.ckpt"
 
 # Feature options
 feature:
+  # Human middle dot
+  human_dot: True
+
   # Human bounding box
   human_box: True
 
@@ -48,4 +51,5 @@ feature:
     grow: 3
     decay: 1
     blur: 0.8
-    alpha: 0.8
+    alpha: 0.3
+    save_video: true
