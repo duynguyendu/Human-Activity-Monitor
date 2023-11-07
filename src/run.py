@@ -1,5 +1,5 @@
+from pathlib import Path
 import shutil
-import os
 
 from omegaconf import DictConfig
 from tqdm import tqdm
@@ -15,7 +15,8 @@ autosetup()
 from modules.data.transform import DataTransformation
 from components.detectors.yolo_v8 import YoloV8
 from components.classifiers.vit import ViT
-from components.utils.heatmap import Heatmap
+from components.features import *
+from modules.video import Video
 
 
 @hydra.main(config_path="../configs", config_name="run", version_base="1.3")
@@ -34,76 +35,85 @@ def main(cfg: DictConfig) -> None:
     classifier = ViT(**cfg["classifier"])
 
     # Open video
-    if not os.path.exists(cfg["path"]):
-        raise FileNotFoundError(
-            f"Cannot locate {cfg['path']}. Use full path or check again."
-        )
-    cap = cv2.VideoCapture(cfg["path"])
+    cap = Video.open(path=cfg["path"])
 
-    # Video progess
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    total_frame = Video.get_total_frame(cap)
 
     # Config video progress bar
     progress_bar = tqdm(
-        total=total_frames,
-        desc=f"{cfg['path'].split('/')[-1]}",
+        total=total_frame,
+        desc=str(Path(cfg["path"]).name),
         unit=" frame",
         miniters=1,
-        smoothing=1,
+        smoothing=0.1,
     )
 
     # Frame loop
-    while cap.isOpened():
-        ret, frame = cap.read()
-
-        if not ret:
-            break
-
+    for frame in Video.get_frame(cap):
         # Frame sampling
         if progress_bar.n % cfg["sampling"] != 0:
-            progress_bar.update(1)
             continue
 
         # Initial
         if progress_bar.n == 0:
+            # avg_heat = 0
             pause = False
-            counter = list()
+
+            text_format = lambda text, pos: cv2.putText(
+                frame,
+                text,
+                pos,
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (255, 255, 255),
+                2,
+            )
+
+            if cfg["enable"]["person_count"]:
+                human_counter = HumanCount(
+                    smoothness=cfg["feature"]["person_count"]["smoothness"]
+                )
 
             if cfg["enable"]["heatmap"]:
-                Heatmap.LAYER = Heatmap.new_layer_from_image(frame)
+                heatmap = Heatmap(layer=np.zeros_like(frame, dtype=np.uint8))
+
+                if cfg["feature"]["heatmap"]["save_video"]:
+                    heatmap.config_writer(
+                        save_path=f"records/{str(Path(cfg['path']).stem)}/heatmap.mp4",
+                        fps=Video.get_fps(cap),
+                        size=Video.get_size(cap),
+                    )
 
         # Detect human
         outputs = detector(frame)
-
-        # Human counter smoothness
-        counter.append(len(outputs))
-        if len(counter) > cfg["feature"]["person_count"]["smoothness"]:
-            counter.pop(0)
-
-            # center = ((x1 + x2) // 2, (y1 + y2) // 2)
-            # cv2.circle(frame, center, 5, 225, -1)
-            # cv2.putText(frame, str(idx), center, cv2.FONT_HERSHEY_SIMPLEX, 1, 255, 2)
 
         # Heatmap
         if cfg["enable"]["heatmap"]:
             for output in outputs:
                 x1, y1, x2, y2 = output["box"]
 
-                # Update heatmap
-                Heatmap.update(
+                heatmap.update(
                     area=(x1, y1, x2, y2),
                     value=cfg["feature"]["heatmap"]["grow"],
                 )
 
             # Decay
-            Heatmap.decay(cfg["feature"]["heatmap"]["decay"])
+            heatmap.decay(cfg["feature"]["heatmap"]["decay"])
 
             # Apply
-            frame, heatmap = Heatmap.apply(
+            frame, heat_layer = heatmap.apply(
                 image=frame,
                 blurriness=cfg["feature"]["heatmap"]["blur"],
                 alpha=cfg["feature"]["heatmap"]["alpha"],
             )
+
+            # Save
+            # avg_heat += cv2.cvtColor(heatmap, cv2.COLOR_BGR2GRAY).astype(np.float32)
+
+        # Human count
+        if cfg["enable"]["person_count"]:
+            human_counter.update(value=len(outputs))
+            text_format(f"Person: {human_counter.get_value()}", pos=(20, 40))
 
         # Human loop
         for output in outputs:
@@ -113,40 +123,27 @@ def main(cfg: DictConfig) -> None:
             if cfg["feature"]["human_box"]:
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 255), 2)
 
+            # Human dot
+            center = ((x1 + x2) // 2, (y1 + y2) // 2)
+            if cfg["feature"]["human_dot"]:
+                cv2.circle(frame, center, 5, (225, 225, 225), -1)
+                # cv2.putText(frame, str(idx), center, cv2.FONT_HERSHEY_SIMPLEX, 1, 255, 2)
+
             # Classify action
             if cfg["enable"]["classifier"]:
                 X = transfrom(output["human"])
 
                 result = classifier(X)
 
-                cv2.putText(
-                    frame,
-                    result,
-                    (x1, y1 - 5),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1,
-                    (255, 255, 255),
-                    2,
-                )
-
-        # Show total number of people
-        if cfg["enable"]["person_count"]:
-            cv2.putText(
-                frame,
-                f"People: {int(np.mean(counter))}",
-                (20, 40),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (255, 255, 255),
-                2,
-            )
+                text_format(result, pos=(x1, y1 - 5))
 
         cv2.imshow(f"{cfg['path']}", frame)
-        progress_bar.update(1)
+
+        progress_bar.update(cfg["sampling"])
 
         key = cv2.waitKey(cfg["delay"] if not pause else 0) & 0xFF
         if key == ord("q"):
-            exit()
+            break
         if key == ord("p"):
             pause = True
         if key == ord("r"):
@@ -154,7 +151,14 @@ def main(cfg: DictConfig) -> None:
         if key == ord("c"):
             continue
 
-    cv2.destroyAllWindows()
+    # Close up
+    # cv2.imwrite(
+    #     "test.jpg",
+    #     cv2.applyColorMap(
+    #         (avg_heat / progress_bar.n).astype(np.uint8), cv2.COLORMAP_JET
+    #     ),
+    # )
+    Video.end(cap, heatmap.writer)
 
 
 if __name__ == "__main__":
