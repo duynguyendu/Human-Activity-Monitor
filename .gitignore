@@ -9,3 +9,4 @@ weights/*
 !weights/.gitkeep
 tests/*
 TODO.md
+records/*

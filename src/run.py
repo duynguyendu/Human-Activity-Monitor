@@ -1,9 +1,7 @@
-from pathlib import Path
 import shutil
 
 from omegaconf import DictConfig
 from tqdm import tqdm
-import numpy as np
 import hydra
 import cv2
 
@@ -35,30 +33,26 @@ def main(cfg: DictConfig) -> None:
     classifier = ViT(**cfg["classifier"])
 
     # Open video
-    cap = Video.open(path=cfg["path"])
-
-    total_frame = Video.get_total_frame(cap)
+    video = Video(path=cfg["path"])
 
     # Config video progress bar
     progress_bar = tqdm(
-        total=total_frame,
-        desc=str(Path(cfg["path"]).name),
+        total=video.total_frame,
+        desc=video.name,
         unit=" frame",
         miniters=1,
         smoothing=0.1,
     )
 
     # Frame loop
-    for frame in Video.get_frame(cap):
+    for frame in video.get_frame():
         # Frame sampling
         if progress_bar.n % cfg["sampling"] != 0:
+            progress_bar.update(1)
             continue
 
         # Initial
         if progress_bar.n == 0:
-            # avg_heat = 0
-            pause = False
-
             text_format = lambda text, pos: cv2.putText(
                 frame,
                 text,
@@ -75,13 +69,19 @@ def main(cfg: DictConfig) -> None:
                 )
 
             if cfg["enable"]["heatmap"]:
-                heatmap = Heatmap(layer=np.zeros_like(frame, dtype=np.uint8))
+                heatmap = Heatmap(shape=video.size(reverse=True))
 
                 if cfg["feature"]["heatmap"]["save_video"]:
-                    heatmap.config_writer(
-                        save_path=f"records/{str(Path(cfg['path']).stem)}/heatmap.mp4",
-                        fps=Video.get_fps(cap),
-                        size=Video.get_size(cap),
+                    heatmap.save_video(
+                        save_path=f"records/{video.stem}/heatmap.mp4",
+                        fps=video.fps,
+                        size=video.size(),
+                    )
+
+                if cfg["feature"]["heatmap"]["save_image"]:
+                    heatmap.save_image(
+                        save_path=f"records/{video.stem}/heatmap.jpg",
+                        size=video.size(reverse=True),
                     )
 
         # Detect human
@@ -107,9 +107,6 @@ def main(cfg: DictConfig) -> None:
                 alpha=cfg["feature"]["heatmap"]["alpha"],
             )
 
-            # Save
-            # avg_heat += cv2.cvtColor(heatmap, cv2.COLOR_BGR2GRAY).astype(np.float32)
-
         # Human count
         if cfg["enable"]["person_count"]:
             human_counter.update(value=len(outputs))
@@ -127,7 +124,6 @@ def main(cfg: DictConfig) -> None:
             center = ((x1 + x2) // 2, (y1 + y2) // 2)
             if cfg["feature"]["human_dot"]:
                 cv2.circle(frame, center, 5, (225, 225, 225), -1)
-                # cv2.putText(frame, str(idx), center, cv2.FONT_HERSHEY_SIMPLEX, 1, 255, 2)
 
             # Classify action
             if cfg["enable"]["classifier"]:
@@ -139,26 +135,13 @@ def main(cfg: DictConfig) -> None:
 
         cv2.imshow(f"{cfg['path']}", frame)
 
-        progress_bar.update(cfg["sampling"])
+        progress_bar.update(1)
 
-        key = cv2.waitKey(cfg["delay"] if not pause else 0) & 0xFF
-        if key == ord("q"):
+        if not video.delay(cfg["delay"]):
             break
-        if key == ord("p"):
-            pause = True
-        if key == ord("r"):
-            pause = False
-        if key == ord("c"):
-            continue
 
-    # Close up
-    # cv2.imwrite(
-    #     "test.jpg",
-    #     cv2.applyColorMap(
-    #         (avg_heat / progress_bar.n).astype(np.uint8), cv2.COLORMAP_JET
-    #     ),
-    # )
-    Video.end(cap, heatmap.writer)
+    (x.release() for x in (video, heatmap))
+    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":

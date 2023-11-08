@@ -4,10 +4,10 @@
 # Path to video
 path: ...
 
-# Choose 1 frame every n step
-sampling: 1
+# Frame speed
+sampling: 10
 
-# Frame delay (ms)
+# Frame delay (millisecond)
 delay: 1
 
 # Human image process size
@@ -28,7 +28,7 @@ detector:
   weight: "weights/yolov8x.pt"
   conf: 0.25
   iou: 0.3
-  add_border: True
+  add_border: true
 
 # Human activity classification
 classifier:
@@ -37,10 +37,10 @@ classifier:
 # Feature options
 feature:
   # Human middle dot
-  human_dot: True
+  human_dot: true
 
   # Human bounding box
-  human_box: True
+  human_box: true
 
   # Count total person
   person_count:
@@ -51,5 +51,6 @@ feature:
     grow: 3
     decay: 1
     blur: 0.8
-    alpha: 0.3
+    alpha: 0.5
     save_video: true
+    save_image: true
