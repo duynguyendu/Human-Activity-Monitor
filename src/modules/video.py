@@ -1,3 +1,4 @@
+from functools import cached_property
 from typing import Tuple, Generator
 from pathlib import Path
 import os
@@ -10,103 +11,123 @@ __all__ = ["Video"]
 
 
 class Video:
-    """
-    Video handle class
-
-    Methods:
-        open(path): open video
-        get_frame(cap): return a frames Generator
-        get_size(cap): return video size
-        get_total_frame(cap): return total frame
-        get_fps(cap): return fps
-        writer(save_path, fps, size, codec): return video writer
-        end(*args): close up
-    """
-
-    @staticmethod
-    def open(path: str) -> cv2.VideoCapture:
+    def __init__(self, path: str) -> None:
         """
-        Open video
+        Initializes a Video object.
 
         Args:
             path (str): path of video to open
 
         Raises:
             FileExistsError: if file not found
-
-        Returns:
-            cv2.VideoCapture: video capture
         """
         if not os.path.exists(path):
             raise FileExistsError("File not found. Check again or use absolute path.")
-        return cv2.VideoCapture(path)
+        self.path = path
+        self.pause = False
 
-    @staticmethod
-    def get_frame(cap: cv2.VideoCapture) -> Generator[MatLike, None, None]:
+    @cached_property
+    def name(self) -> str:
         """
-        Return a frames Generator
-
-        Args:
-            cap (cv2.VideoCapture): video capture
-
-        Yields:
-            MatLike: each video frame
-        """
-        for _, frame in iter(cap.read, (False, None)):
-            yield frame
-
-    @staticmethod
-    def get_size(cap: cv2.VideoCapture) -> Tuple[int, int]:
-        """
-        Return video size
-
-        Args:
-            cap (cv2.VideoCapture): video capture
+        Return name of the video
 
         Returns:
-            Tuple: size of the video (Width, Height)
+            str: name of the video
         """
-        return (
-            int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-            int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-        )
+        return str(Path(self.path).name)
 
-    @staticmethod
-    def get_total_frame(cap: cv2.VideoCapture) -> int:
+    @cached_property
+    def stem(self) -> str:
+        """
+        Return name of the video without extension
+
+        Returns:
+            str: name of the video without extension
+        """
+        return str(Path(self.path).stem)
+
+    @cached_property
+    def cap(self) -> cv2.VideoCapture:
+        """
+        Return video capture
+
+        Returns:
+            VideoCapture
+        """
+        return cv2.VideoCapture(self.path)
+
+    @cached_property
+    def total_frame(self) -> int:
         """
         Return total number of frame
-
-        Args:
-            cap (cv2.VideoCapture): video capture
 
         Returns:
             int: total frame
         """
-        return int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        return int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    @staticmethod
-    def get_fps(cap: cv2.VideoCapture) -> int:
+    @cached_property
+    def fps(self) -> int:
         """
         Return FPS of the video
-
-        Args:
-            cap (cv2.VideoCapture): video capture
 
         Returns:
             int: FPS of the video
         """
-        return int(cap.get(cv2.CAP_PROP_FPS))
+        return int(self.cap.get(cv2.CAP_PROP_FPS))
 
-    def writer(
-        save_path: str, fps: int, size: Tuple, codec: str = "mp4v"
-    ) -> cv2.VideoWriter:
+    def size(self, reverse: bool = False) -> Tuple[int, int]:
+        """
+        Return video size
+
+        Args:
+            reverse (bool): reverse output. Defaults to (Width, Height)
+
+        Returns:
+            Tuple: size of the video
+        """
+        w, h = (
+            int(self.cap.get(prop))
+            for prop in [cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT]
+        )
+        return (w, h) if not reverse else (h, w)
+
+    def get_frame(self) -> Generator[MatLike, None, None]:
+        """
+        Return a frames Generator
+
+        Yields:
+            MatLike: each video frame
+        """
+        for _, frame in iter(self.cap.read, (False, None)):
+            yield frame
+
+    def delay(self, value: int) -> bool:
+        """
+        Video delay
+
+        Args:
+            value (int): millisecond
+
+        Returns:
+            bool: True if continue else False
+        """
+        key = cv2.waitKey(value if not self.pause else 0) & 0xFF
+
+        # Check pause status
+        self.pause = (
+            True if key == ord("p") else False if key == ord("r") else self.pause
+        )
+
+        # Check continue
+        return True if not key == ord("q") else False
+
+    def writer(self, save_path: str, codec: str = "mp4v") -> cv2.VideoWriter:
         """
         Create a video writer
 
         Args:
             save_path (str): path to store writed video.
-            fps (int): FPS of output video.
-            size (Tuple): size of output video.
             codec (str, optional): codec for write video. Defaults to "mp4v".
 
         Returns:
@@ -120,11 +141,10 @@ class Video:
         return cv2.VideoWriter(
             filename=str(save_path),
             fourcc=cv2.VideoWriter_fourcc(*codec),
-            fps=fps,
-            frameSize=size,
+            fps=self.fps,
+            frameSize=self.size(),
         )
 
-    def end(*args: cv2.VideoCapture) -> None:
-        """Close up all video process"""
-        [cap.release() for cap in args]
-        cv2.destroyAllWindows()
+    def release(self) -> None:
+        """Release capture"""
+        self.cap.release()
