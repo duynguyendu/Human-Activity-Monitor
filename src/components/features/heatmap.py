@@ -8,42 +8,14 @@ from src.modules.utils import tuple_handler
 
 
 class Heatmap:
-    def __init__(self, layer: np.ndarray) -> None:
+    def __init__(self, shape: Tuple[int, int]) -> None:
         """
         Initializes a Heatmap object.
 
         Args:
             layer (np.ndarray): starting layer
         """
-        self.layer = layer
-
-    def config_writer(
-        self, save_path: str, fps: int, size: Tuple, codec: str = "mp4v"
-    ) -> None:
-        """
-        Create a video writer for heatmap
-
-        Args:
-            save_path (str): path to store writed video.
-            fps (int): FPS of output video.
-            size (Tuple): size of output video.
-            codec (str, optional): codec for write video. Defaults to "mp4v".
-
-        Returns:
-            None
-        """
-        save_path = Path(save_path)
-
-        # Create save folder
-        save_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Create video writer
-        self.writer = cv2.VideoWriter(
-            filename=str(save_path),
-            fourcc=cv2.VideoWriter_fourcc(*codec),
-            fps=fps,
-            frameSize=size,
-        )
+        self.layer = np.zeros(shape=tuple_handler(shape, max_dim=2), dtype=np.uint8)
 
     def update(self, area: Tuple, value: int) -> np.ndarray:
         """
@@ -99,12 +71,75 @@ class Heatmap:
         self.layer = cv2.stackBlur(self.layer, (blurriness, blurriness), 0)
 
         # Apply heat to layer
-        heatmap = cv2.applyColorMap(self.layer, cv2.COLORMAP_JET)
-
-        if hasattr(self, "writer"):
-            self.writer.write(heatmap)
+        heatmap = cv2.applyColorMap(self.layer, cv2.COLORMAP_TURBO)
 
         # Combined image and heat layer
         cv2.addWeighted(heatmap, alpha, image, 1 - alpha, 0, image)
 
+        # Check if save video
+        if hasattr(self, "_video_writer"):
+            self._video_writer.write(heatmap)
+
+        # Check if save image
+        if hasattr(self, "_image_writer"):
+            self._image_writer["count"] += 1
+            self._image_writer["image"] += heatmap
+            cv2.imwrite(
+                self._image_writer["path"],
+                (self._image_writer["image"] / self._image_writer["count"]).astype(
+                    np.uint8
+                ),
+            )
+
         return image, heatmap
+
+    def save_video(
+        self, save_path: str, fps: int, size: Tuple, codec: str = "mp4v"
+    ) -> None:
+        """
+        Create a video writer for heatmap
+
+        Args:
+            save_path (str): path to store writed video.
+            fps (int): FPS of output video.
+            size (Tuple): size of output video.
+            codec (str, optional): codec for write video. Defaults to "mp4v".
+
+        Returns:
+            None
+        """
+        save_path = Path(save_path)
+
+        # Create save folder
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Create video writer
+        self._video_writer = cv2.VideoWriter(
+            filename=str(save_path),
+            fourcc=cv2.VideoWriter_fourcc(*codec),
+            fps=fps,
+            frameSize=size,
+        )
+
+    def save_image(self, save_path: str, size: Tuple) -> None:
+        """_summary_
+
+        Args:
+            save_path (str): _description_
+            size (Tuple): _description_
+        """
+        save_path = Path(save_path)
+
+        #  Create save folder
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+
+        self._image_writer = {
+            "path": str(save_path),
+            "count": 0,
+            "image": np.zeros(tuple_handler((*size, 3), max_dim=3), dtype=np.float32),
+        }
+
+    def release(self):
+        """Release capture"""
+        if hasattr(self, "writer"):
+            self.writer.release()
