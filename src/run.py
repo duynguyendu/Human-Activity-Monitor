@@ -46,13 +46,13 @@ def main(cfg: DictConfig) -> None:
         unit=" frame",
         miniters=1,
         smoothing=0.1,
-        delay=1,
+        delay=0.5,
     )
 
     # Frame loop
     for frame in video.get_frame():
         # Frame sampling
-        if progress_bar.n % cfg["video"]["sampling"] != 0:
+        if progress_bar.n % max(1, cfg["video"]["sampling"]) != 0:
             progress_bar.update(1)
             continue
 
@@ -81,9 +81,17 @@ def main(cfg: DictConfig) -> None:
                 print(f"  [bold]Saving output to:[/] [green]{save_path}[/]")
 
             # Initialize person count
-            if cfg["feature"]["person_count"]["enable"]:
-                human_counter = HumanCount(
-                    smoothness=cfg["feature"]["person_count"]["smoothness"]
+            human_count_cfg = cfg["feature"]["person_count"]
+            if human_count_cfg["enable"]:
+                human_counter = HumanCount(smoothness=human_count_cfg["smoothness"])
+                human_counter.save_config(
+                    save_path=os.path.join(
+                        human_count_cfg["save"]["save_path"],
+                        video.stem,
+                        human_count_cfg["save"]["save_name"] + ".csv",
+                    ),
+                    interval=human_count_cfg["save"]["interval"],
+                    sampling=cfg["video"]["sampling"],
                 )
 
             # Initialize heatmap
@@ -140,8 +148,10 @@ def main(cfg: DictConfig) -> None:
             )
 
         # Human count
-        if cfg["feature"]["person_count"]["enable"]:
+        if human_count_cfg["enable"]:
+            # Update new value
             human_counter.update(value=len(outputs))
+            # Add to frame
             add_text(f"Person: {human_counter.get_value()}", pos=(20, 40))
 
         # Human loop

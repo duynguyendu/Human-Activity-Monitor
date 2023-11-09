@@ -1,3 +1,4 @@
+from pathlib import Path
 import numpy as np
 
 
@@ -9,13 +10,18 @@ class HumanCount:
         Parameters:
             smoothness (int): The number of recent values to consider for smoothing.
                 A higher value results in a smoother, but potentially slower, response.
-
-        Attributes:
-            smoothness (int): The smoothing parameter.
-            history (list): A list to store historical values for smoothing.
         """
         self.smoothness = smoothness
         self.history = list()
+
+    def get_value(self) -> int:
+        """
+        Computes and returns the smoothed average of the historical values.
+
+        Returns:
+            int: The smoothed average of the historical values.
+        """
+        return int(np.mean(self.history))
 
     def update(self, value: int) -> None:
         """
@@ -31,11 +37,37 @@ class HumanCount:
         if len(self.history) > self.smoothness:
             self.history.pop(0)
 
-    def get_value(self) -> int:
+        if hasattr(self, "save_conf"):
+            current = int(self.save_conf["count"] * self.save_conf["sampling"])
+            if self.save_conf["count"] != 0:
+                if (current % self.save_conf["interval"]) == 0:
+                    with open(self.save_conf["save_path"], "a") as f:
+                        f.write(f"{current},{self.get_value()}\n")
+
+            self.save_conf["count"] += 1
+
+    def save_config(self, save_path: str, interval: int, sampling: int = 1) -> None:
         """
-        Computes and returns the smoothed average of the historical values.
+        Configurate save
+
+        Args:
+            save_path (str): Path to save output
+            interval (int): Save every n (second)
 
         Returns:
-            int: The smoothed average of the historical values.
+            None
         """
-        return int(np.mean(self.history))
+        save_path = Path(save_path)
+
+        # Create save folder
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(save_path, "w") as f:
+            f.write("frame,value" + "\n")
+
+        self.save_conf = {
+            "save_path": save_path,
+            "count": 0,
+            "interval": interval,
+            "sampling": max(1, sampling),
+        }
