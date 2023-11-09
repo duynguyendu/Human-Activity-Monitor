@@ -9,6 +9,8 @@ import os, sys
 sys.path.extend([os.getcwd(), f"{os.getcwd()}/src"])
 
 from src.components.detectors.yolo_v8 import YoloV8
+from src.modules.data import ImageProcessing
+from src.modules.utils import tuple_handler
 
 
 def ssim(image_1, image_2):
@@ -18,15 +20,19 @@ def ssim(image_1, image_2):
 
 
 def main():
-    PATH = "/media/ht0710/Run/Data/Custom"
+    PATH = "/media/ht0710/Data/Data/Custom"
 
     THRESHOLD = 0.3
 
     SAMPLING = 5
 
+    MARGIN = 30
+
+    SIZE = 224
+
     SAVE_PATH = f"data/processed/{THRESHOLD}"
 
-    MODEL = YoloV8(weight="weights/yolov8x.pt", margin=30)
+    MODEL = YoloV8(weight="weights/yolov8x.pt")
 
     data = sorted(
         os.listdir(PATH),
@@ -58,11 +64,23 @@ def main():
             if i % SAMPLING == 0:
                 outputs = MODEL(frame)
 
+                current = []
                 for j, output in enumerate(outputs, 1):
+                    x1, y1, x2, y2 = output
+
+                    x1 = max(0, x1 - MARGIN)
+                    y1 = max(0, y1 - MARGIN)
+                    x2 = min(frame.shape[1], x2 + MARGIN)
+                    y2 = min(frame.shape[1], y2 + MARGIN)
+
+                    human = frame[y1:y2, x1:x2]
+
+                    human = ImageProcessing.add_border(human)
+
+                    human = cv2.resize(human, tuple_handler(SIZE))
+
                     if prev_run:
-                        scores = set(
-                            ssim(prev["human"], output["human"]) for prev in prev_run
-                        )
+                        scores = set(ssim(prev, human) for prev in prev_run)
                         best = max(scores)
 
                         prev_run.pop(np.argmax(best))
@@ -70,9 +88,11 @@ def main():
                         if best > THRESHOLD:
                             continue
 
-                    cv2.imwrite(f"{save_path}/{i}_{j}.jpg", output["human"])
+                    current.append(human)
 
-                prev_run = outputs
+                    cv2.imwrite(f"{save_path}/{i}_{j}.jpg", human)
+
+                prev_run = current
 
             progress_bar.update(1)
 
