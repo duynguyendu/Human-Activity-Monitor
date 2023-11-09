@@ -26,12 +26,10 @@ def main(cfg: DictConfig) -> None:
 
     # Define main componets
     # Detector
-    detector = YoloV8(
-        **cfg["detector"], size=cfg["video"]["image_size"], device=cfg["device"]
-    )
+    detector = YoloV8(**cfg["detector"], device=cfg["device"])
 
     # Transform
-    transfrom = DataTransformation.TOPIL(image_size=cfg["video"]["image_size"])
+    transfrom = DataTransformation.TOPIL(image_size=cfg["classifier"]["image_size"])
 
     # Classifier
     classifier = ViT(checkpoint=cfg["classifier"]["checkpoint"], device=cfg["device"])
@@ -130,7 +128,7 @@ def main(cfg: DictConfig) -> None:
         # Heatmap
         if heatmap_cfg["enable"]:
             for output in outputs:
-                x1, y1, x2, y2 = output["box"]
+                x1, y1, x2, y2 = output
 
                 heatmap.update(
                     area=(x1, y1, x2, y2),
@@ -156,7 +154,7 @@ def main(cfg: DictConfig) -> None:
 
         # Human loop
         for output in outputs:
-            x1, y1, x2, y2 = output["box"]
+            x1, y1, x2, y2 = output
 
             # Human box
             if cfg["feature"]["human_box"]:

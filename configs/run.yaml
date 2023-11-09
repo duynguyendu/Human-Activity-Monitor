@@ -12,8 +12,6 @@ video:
   sampling: 2
   # Frame delay (millisecond)
   delay: 1
-  # Human image process size
-  image_size: 224
   # Write output
   save_output:
     enable: true
@@ -25,11 +23,11 @@ detector:
   weight: weights/yolov8x.pt
   conf: 0.25
   iou: 0.3
-  add_border: true
 
 # Human activity classification
 classifier:
   enable: false
+  image_size: 224
   checkpoint: logs/epoch=23-step=1344.ckpt
 
 # Feature options
