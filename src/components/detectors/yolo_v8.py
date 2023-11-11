@@ -12,7 +12,9 @@ class YoloV8:
         self,
         weight: str = None,
         conf: float = 0.25,
-        iou: float = 0.3,
+        iou: float = 0.7,
+        size: int | Tuple = 640,
+        half: bool = False,
         track: bool = False,
         device: str = "auto",
     ):
@@ -23,14 +25,17 @@ class YoloV8:
             weight (str, optional): Path to the YOLO model weights file. Defaults to None.
             conf (float, optional): Confidence threshold for object detection. Defaults to 0.25.
             iou (float, optional): Intersection over Union (IoU) threshold. Defaults to 0.3.
-            device (str, optional): Device on which to run the YOLO model ('auto', 'cuda', or 'cpu'). Defaults to "auto".
+            size (int or Tuple, optional): Input size for the YOLO model. Defaults to 640.
+            half (bool, optional): Use half precision (float16) for inference. Defaults to False.
+            track (bool, optional): Enable object tracking. Defaults to False.
+            device (str, optional): Device to run the model ('auto', 'cuda', or 'cpu'). Defaults to "auto".
         """
         if device == "auto":
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
         self.track = track
         self.model = YOLO(weight if weight else "weights/yolov8x.pt").to(self.device)
-        self.config = {"conf": conf, "iou": iou}
+        self.config = {"conf": conf, "iou": iou, "imgsz": size, "half": half}
 
     def __call__(self, image: MatLike) -> List[Tuple]:
         """
@@ -70,9 +75,16 @@ class YoloV8:
         outputs = []
         if result.boxes:
             for box in result.boxes:
-                x1, y1, x2, y2, idx = (int(i.item()) for i in box.data[0][:5])
-                outputs.append(
-                    {"box": (x1, y1, x2, y2), "id": idx if self.track else None}
-                )
+                data = [i.item() for i in box.data[0][:6]]
+
+                x1, y1, x2, y2 = (int(i) for i in data[:4])
+
+                human = {"box": (x1, y1, x2, y2)}
+
+                A, B = data[4:]
+
+                human.update({"id": int(A), "conf": B} if self.track else {"conf": A})
+
+                outputs.append(human)
 
         return outputs
