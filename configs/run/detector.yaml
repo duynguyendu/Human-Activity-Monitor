@@ -1,0 +1,25 @@
+# Configuration for detection
+
+
+detector:
+  # Model confuration
+  model:
+    # Model weight path
+    weight: weights/yolov8x.pt
+
+    # Confidence threshold for detection
+    conf: 0.25
+
+    # Intersection over Union
+    iou: 0.3
+
+    # Enable tracking
+    track: true
+
+  # Draw output
+  show:
+    # Box surrounding
+    human_box: true
+
+    # Central dot
+    human_dot: false

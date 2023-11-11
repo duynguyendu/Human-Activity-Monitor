@@ -38,7 +38,7 @@ class HumanCount:
             self.history.pop(0)
 
         if hasattr(self, "save_conf"):
-            current = int(self.save_conf["count"] * self.save_conf["sampling"])
+            current = int(self.save_conf["count"] * self.save_conf["speed"])
             if self.save_conf["count"] != 0:
                 if (current % self.save_conf["interval"]) == 0:
                     with open(self.save_conf["save_path"], "a") as f:
@@ -46,7 +46,7 @@ class HumanCount:
 
             self.save_conf["count"] += 1
 
-    def save_config(self, save_path: str, interval: int, sampling: int = 1) -> None:
+    def save_config(self, save_path: str, interval: int, speed: int = 1) -> None:
         """
         Configurate save
 
@@ -69,5 +69,5 @@ class HumanCount:
             "save_path": save_path,
             "count": 0,
             "interval": interval,
-            "sampling": max(1, sampling),
+            "speed": max(1, speed),
         }

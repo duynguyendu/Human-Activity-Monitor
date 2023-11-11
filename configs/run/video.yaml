@@ -1,0 +1,21 @@
+# Configuration for detection
+
+
+video:
+  # Path to video (must be specified)
+  path: ???
+
+  # Video speed multiplied
+  speed: 2
+
+  # Frame delay (millisecond)
+  delay: 1
+
+  # Save output
+  save:
+    # Save path and name
+    save_path: records/
+    save_name: output
+
+    # Video output resolution
+    resolution: [ 1280, 720 ]

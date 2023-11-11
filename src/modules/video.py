@@ -6,6 +6,8 @@ import os
 from cv2.typing import MatLike
 import cv2
 
+from src.modules.utils import tuple_handler
+
 
 __all__ = ["Video"]
 
@@ -148,3 +150,32 @@ class Video:
     def release(self) -> None:
         """Release capture"""
         self.cap.release()
+
+    def add_text(
+        self,
+        frame: MatLike,
+        text: str,
+        pos: Tuple,
+        font_scale: int = 1,
+        color: Tuple = 255,
+        thickness: int = 2,
+    ) -> None:
+        """
+        Add text to video
+
+        Args:
+            frame (MatLike): frame to add text
+            text (str): text to add
+
+        Returns:
+            None
+        """
+        cv2.putText(
+            img=frame,
+            text=str(text),
+            org=tuple_handler(pos, max_dim=2),
+            fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+            fontScale=font_scale,
+            color=tuple_handler(color, max_dim=3),
+            thickness=thickness,
+        )

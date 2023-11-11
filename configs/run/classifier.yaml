@@ -1,0 +1,9 @@
+# Configuration for classifier
+
+
+classifier:
+  # Model weight path
+  checkpoint: weights/epoch=23-step=1344.ckpt
+
+  # Size of the image to be classified
+  image_size: 224
