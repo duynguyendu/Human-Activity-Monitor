@@ -66,7 +66,7 @@ def main():
 
                 current = []
                 for j, output in enumerate(outputs, 1):
-                    x1, y1, x2, y2 = output
+                    x1, y1, x2, y2 = output["box"]
 
                     x1 = max(0, x1 - MARGIN)
                     y1 = max(0, y1 - MARGIN)
