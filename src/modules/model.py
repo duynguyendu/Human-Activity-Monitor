@@ -10,16 +10,15 @@ from lightning.pytorch import LightningModule
 from rich import print
 
 
-
 class LitModel(LightningModule):
     def __init__(
-            self, 
-            model: nn.Module,
-            criterion: nn.Module = None,
-            optimizer: optim.Optimizer | Dict = None,
-            scheduler: optim.Optimizer = None,
-            checkpoint: str = None
-        ):
+        self,
+        model: nn.Module,
+        criterion: nn.Module = None,
+        optimizer: optim.Optimizer | Dict = None,
+        scheduler: optim.Optimizer = None,
+        checkpoint: str = None,
+    ):
         """
         Initialize the Lightning Model.
 
@@ -38,10 +37,8 @@ class LitModel(LightningModule):
         if checkpoint:
             self.load(checkpoint)
 
-
     def forward(self, X):
         return self.model(X)
-
 
     def configure_optimizers(self):
         if not self.scheduler:
@@ -52,19 +49,15 @@ class LitModel(LightningModule):
             self.scheduler = [self.scheduler]
         return self.optimizer, self.scheduler
 
-
     def _log(self, stage: str, loss, y_hat, y):
         acc = accuracy(
-            preds = y_hat, 
-            target = y, 
-            task = 'multiclass', 
-            num_classes = self.model.num_classes
+            preds=y_hat, target=y, task="multiclass", num_classes=self.model.num_classes
         )
         self.log_dict(
-            dictionary = {f"{stage}/loss": loss, f"{stage}/accuracy": acc},
-            on_step = False, on_epoch = True
+            dictionary={f"{stage}/loss": loss, f"{stage}/accuracy": acc},
+            on_step=False,
+            on_epoch=True,
         )
-
 
     def training_step(self, batch, batch_idx):
         X, y = batch
@@ -73,13 +66,11 @@ class LitModel(LightningModule):
         self._log(stage="train", loss=loss, y_hat=y_hat, y=y)
         return loss
 
-
     def validation_step(self, batch, batch_idx):
         X, y = batch
         y_hat = self(X)
         loss = self.criterion(y_hat, y)
         self._log(stage="val", loss=loss, y_hat=y_hat, y=y)
-
 
     def test_step(self, batch, batch_idx):
         X, y = batch
@@ -87,17 +78,15 @@ class LitModel(LightningModule):
         loss = self.criterion(y_hat, y)
         self._log(stage="test", loss=loss, y_hat=y_hat, y=y)
 
-
-    def load(self, path: str, strict: bool=True, verbose: bool=True):
+    def load(self, path: str, strict: bool = True, verbose: bool = True):
         if not os.path.exists(path):
             raise FileNotFoundError(path)
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        device = "cuda" if torch.cuda.is_available() else "cpu"
         self.load_state_dict(
-            state_dict = torch.load(path, map_location=device)['state_dict'],
-            strict = strict
+            state_dict=torch.load(path, map_location=device)["state_dict"],
+            strict=strict,
         )
         print("[bold]Load checkpoint:[/] Done") if verbose else None
-
 
     def save_hparams(self, config: Dict) -> None:
         self.hparams.update(config)
