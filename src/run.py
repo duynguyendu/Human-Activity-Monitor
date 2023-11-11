@@ -1,5 +1,5 @@
-import os
 import shutil
+import os
 
 from omegaconf import DictConfig
 from rich import print
@@ -26,10 +26,7 @@ def main(cfg: DictConfig) -> None:
 
     # Define main componets
     # Detector
-    DETECTOR = YoloV8(
-        **cfg["detector"]["model"],
-        device=cfg["device"],
-    )
+    DETECTOR = YoloV8(**cfg["detector"]["model"], device=cfg["device"])
 
     if cfg["classifier"]:
         # Transform
@@ -60,7 +57,7 @@ def main(cfg: DictConfig) -> None:
     )
 
     # Frame loop
-    for frame in VIDEO.get_frame():
+    for frame in VIDEO:
         # Frame sampling
         if (progress_bar.n % max(1, cfg["video"]["speed"])) != 0:
             progress_bar.update(1)
@@ -106,6 +103,7 @@ def main(cfg: DictConfig) -> None:
                     VIDEO.stem,
                     heatmap_cfg["save"]["save_name"],
                 )
+                # Check video save
                 if heatmap_cfg["save"]["video"]:
                     heatmap.save_video(
                         save_path=hm_save_path + ".mp4",
@@ -115,6 +113,7 @@ def main(cfg: DictConfig) -> None:
                     print(
                         f"  [bold]Saving heatmap video to:[/] [green]{hm_save_path}.mp4[/]"
                     )
+                # Check image save
                 if heatmap_cfg["save"]["image"]:
                     heatmap.save_image(
                         save_path=hm_save_path + ".jpg",
@@ -154,7 +153,7 @@ def main(cfg: DictConfig) -> None:
             human_counter.update(value=len(outputs))
             # Add to frame
             VIDEO.add_text(
-                frame, text=f"Person: {human_counter.get_value()}", pos=(20, 40)
+                text=f"Person: {human_counter.get_value()}", pos=(20, 40), thickness=2
             )
 
         # Human loop
@@ -163,7 +162,9 @@ def main(cfg: DictConfig) -> None:
 
             # Human box
             if cfg["detector"]["show"]["human_box"]:
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 255), 2)
+                VIDEO.add_box(
+                    top_left=(x1, y1), bottom_right=(x2, y2), color=255, thickness=2
+                )
 
             # Human dot
             center = ((x1 + x2) // 2, (y1 + y2) // 2)
@@ -178,25 +179,41 @@ def main(cfg: DictConfig) -> None:
 
                 result = CLASSIFIER(X)
 
-                VIDEO.add_text(frame, text=result, pos=(x1, y1 - 5))
+                VIDEO.add_text(text=result, pos=(x1, y1 - 5), thickness=2)
 
             # Tracker
             if cfg["detector"]["model"]["track"]:
-                VIDEO.add_text(frame, text=output["id"], pos=(x1, y1 - 5))
+                VIDEO.add_text(text=output["id"], pos=(x1, y1 - 5), thickness=2)
 
+            # Confidence score
+            if cfg["detector"]["show"]["score"]:
+                VIDEO.add_text(
+                    text=f"{output['conf']:.2}", pos=(x1, y2 - 5), thickness=2
+                )
+
+        # Show track box
         TrackBox.show(frame)
 
-        cv2.imshow(VIDEO.stem, frame)
+        # Show main video
+        VIDEO.show()
 
+        # Write output
         if writer_cfg:
             writer.write(frame)
 
+        # Update progress
         progress_bar.update(1)
 
+        # Delay and check keyboard input
         if not VIDEO.delay(cfg["video"]["delay"]):
             break
 
-    [x.release() for x in (VIDEO, writer, heatmap)]
+    # Release
+    if heatmap_cfg:
+        heatmap.release()
+    if writer_cfg:
+        writer.release()
+    VIDEO.release()
     cv2.destroyAllWindows()
 
 
