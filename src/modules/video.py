@@ -13,20 +13,61 @@ __all__ = ["Video"]
 
 
 class Video:
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, resolution: Tuple = None) -> None:
         """
         Initializes a Video object.
 
         Args:
-            path (str): path of video to open
+            path (str): Path of the video to open.
 
         Raises:
-            FileExistsError: if file not found
+            FileExistsError: If the file is not found.
         """
         if not os.path.exists(path):
-            raise FileExistsError("File not found. Check again or use absolute path.")
+            raise FileExistsError(
+                "File not found. Check again or use an absolute path."
+            )
+        self.video_capture = cv2.VideoCapture(path)
         self.path = path
+        self.resolution = tuple_handler(resolution, max_dim=2) if resolution else None
         self.pause = False
+
+    def __iter__(self) -> "Video":
+        """
+        Initialize video iteration.
+
+        Returns:
+            Video: The video object.
+        """
+        self.current_frame = None
+        return self
+
+    def __next__(self) -> MatLike:
+        """
+        Get the next frame from the video.
+
+        Returns:
+            MatLike: The next frame.
+
+        Raises:
+            StopIteration: When there are no more frames.
+        """
+        ret, frame = self.video_capture.read()
+        if not ret:
+            raise StopIteration
+        if self.resolution:
+            frame = cv2.resize(frame, self.resolution)
+        self.current_frame = frame
+        return self.current_frame
+
+    def __len__(self) -> int:
+        """
+        Get the total number of frames in the video.
+
+        Returns:
+            int: Total number of frames.
+        """
+        return int(self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
 
     @cached_property
     def name(self) -> str:
@@ -56,7 +97,7 @@ class Video:
         Returns:
             VideoCapture
         """
-        return cv2.VideoCapture(self.path)
+        return self.video_capture
 
     @cached_property
     def total_frame(self) -> int:
@@ -93,16 +134,6 @@ class Video:
             for prop in [cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT]
         )
         return (w, h) if not reverse else (h, w)
-
-    def get_frame(self) -> Generator[MatLike, None, None]:
-        """
-        Return a frames Generator
-
-        Yields:
-            MatLike: each video frame
-        """
-        for _, frame in iter(self.cap.read, (False, None)):
-            yield frame
 
     def delay(self, value: int) -> bool:
         """
@@ -147,35 +178,68 @@ class Video:
             frameSize=self.size(),
         )
 
-    def release(self) -> None:
-        """Release capture"""
-        self.cap.release()
+    def add_box(
+        self,
+        top_left: Tuple,
+        bottom_right: Tuple,
+        color: Tuple = (255, 255, 255),
+        thickness: int = 1,
+    ) -> None:
+        """
+        Add a rectangle to the current frame.
+
+        Args:
+            top_left (Tuple): Top-left corner coordinates (x, y).
+            bottom_right (Tuple): Bottom-right corner coordinates (x, y).
+            color (Tuple, optional): Color of the rectangle (B, G, R). Defaults to (255, 255, 255).
+            thickness (int, optional): Thickness of the rectangle outline. Defaults to 1.
+
+        Returns:
+            None
+        """
+        cv2.rectangle(
+            img=self.current_frame,
+            pt1=tuple_handler(top_left, max_dim=2),
+            pt2=tuple_handler(bottom_right, max_dim=2),
+            color=tuple_handler(color, max_dim=3),
+            thickness=int(thickness),
+        )
 
     def add_text(
         self,
-        frame: MatLike,
         text: str,
         pos: Tuple,
         font_scale: int = 1,
-        color: Tuple = 255,
-        thickness: int = 2,
+        color: Tuple = (255, 255, 255),
+        thickness: int = 1,
     ) -> None:
         """
-        Add text to video
+        Add text to the current frame.
 
         Args:
-            frame (MatLike): frame to add text
-            text (str): text to add
+            text (str): Text to add.
+            pos (Tuple): Position coordinates (x, y).
+            font_scale (int, optional): Font scale for the text. Defaults to 1.
+            color (Tuple, optional): Color of the text (B, G, R). Defaults to (255, 255, 255).
+            thickness (int, optional): Thickness of the text. Defaults to 1.
 
         Returns:
             None
         """
         cv2.putText(
-            img=frame,
+            img=self.current_frame,
             text=str(text),
             org=tuple_handler(pos, max_dim=2),
             fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-            fontScale=font_scale,
+            fontScale=int(font_scale),
             color=tuple_handler(color, max_dim=3),
-            thickness=thickness,
+            thickness=int(thickness),
         )
+
+    def show(self) -> None:
+        """Show the frame"""
+        cv2.imshow(self.stem, self.current_frame)
+
+    def release(self) -> None:
+        """Release capture"""
+        self.video_capture.release()

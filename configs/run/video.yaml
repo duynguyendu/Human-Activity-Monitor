@@ -2,14 +2,17 @@
 
 
 video:
-  # Path to video (must be specified)
+  # Path to video
   path: ???
 
   # Video speed multiplied
-  speed: 2
+  speed: 1
 
   # Frame delay (millisecond)
   delay: 1
+
+  # Video resolution
+  resolution: [ 1280, 720 ]
 
   # Save output
   save:
@@ -17,5 +20,5 @@ video:
     save_path: records/
     save_name: output
 
-    # Video output resolution
-    resolution: [ 1280, 720 ]
+    # Output resolution
+    resolution: [ 1024, 576 ]
