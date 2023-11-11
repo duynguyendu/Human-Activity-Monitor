@@ -5,19 +5,28 @@ detector:
   # Model confuration
   model:
     # Model weight path
-    weight: weights/yolov8x.pt
+    weight: weights/yolov8m.pt
 
     # Confidence threshold for detection
     conf: 0.25
 
     # Intersection over Union
-    iou: 0.3
+    iou: 0.7
+
+    # Input size for the model
+    size: 640
+
+    # Use half precision (float16) for inference
+    half: true
 
     # Enable tracking
-    track: true
+    track: false
 
   # Draw output
   show:
+    # Detection confidence score
+    score: false
+
     # Box surrounding
     human_box: true
 
