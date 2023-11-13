@@ -33,9 +33,7 @@ def main(cfg: DictConfig) -> None:
         TRANSFORM = DataTransformation.TOPIL(image_size=cfg["classifier"]["image_size"])
 
         # Classifier
-        CLASSIFIER = ViT(
-            checkpoint=cfg["classifier"]["checkpoint"], device=cfg["device"]
-        )
+        CLASSIFIER = ViT(**cfg["classifier"]["model"], device=cfg["device"])
 
     # Load video
     VIDEO = Video(path=cfg["video"]["path"])
@@ -169,13 +167,15 @@ def main(cfg: DictConfig) -> None:
             # Human dot
             center = ((x1 + x2) // 2, (y1 + y2) // 2)
             if cfg["detector"]["show"]["human_dot"]:
-                cv2.circle(frame, center, 5, (225, 225, 225), -1)
+                VIDEO.add_point(center=center, radius=5, color=(225, 225, 225))
 
             TrackBox.check(pos=center)
 
             # Classify action
             if cfg["classifier"]:
-                X = TRANSFORM(output["human"])
+                human = frame[y1:y2, x1:x2]
+
+                X = TRANSFORM(human)
 
                 result = CLASSIFIER(X)
 
