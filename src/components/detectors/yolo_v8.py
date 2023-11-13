@@ -1,6 +1,7 @@
 from typing import List, Tuple, Union
 from functools import partial
 
+from rich import print
 import numpy as np
 import torch
 import cv2
@@ -36,6 +37,11 @@ class YoloV8:
         self.device = device
         self.track = track
         self.model = YOLO(weight if weight else "weights/yolov8x.pt").to(self.device)
+        if half and device == "cpu":
+            print(
+                "[yellow][WARNING] Yolo-v8: Half is only supported on CUDA. Using default float32.[/]"
+            )
+            half = False
         self.config = {"conf": conf, "iou": iou, "imgsz": size, "half": half}
 
     def __call__(self, image: Union[cv2.Mat, np.ndarray]) -> List[Tuple]:
