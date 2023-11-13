@@ -2,8 +2,15 @@
 
 
 classifier:
-  # Model weight path
-  checkpoint: weights/epoch=23-step=1344.ckpt
+  model:
+    # Model weight path
+    checkpoint: weights/epoch=23-step=1344.ckpt
 
-  # Size of the image to be classified
+    # Use half-precision (float16) instead of float32 for inference
+    half: true
+
+    # TorchDynamo, the latest method to speed up PyTorch code
+    dynamo: true
+
+  # Size of image for the inference
   image_size: 224
