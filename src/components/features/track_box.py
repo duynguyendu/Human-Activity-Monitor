@@ -2,7 +2,6 @@ from typing import Tuple, Union
 from functools import partial
 import random
 
-from cv2.typing import MatLike
 import numpy as np
 import cv2
 
@@ -100,7 +99,7 @@ class Box:
             thickness=int(thickness),
         )
 
-    def show(self, frame: MatLike):
+    def show(self, frame: Union[cv2.Mat, np.ndarray]):
         """
         Display the box and text on the given frame.
 
@@ -211,7 +210,7 @@ class TrackBox:
         [box["box"].check(pos) for box in cls.BOXES]
 
     @classmethod
-    def show(cls, frame: MatLike) -> None:
+    def show(cls, frame: Union[cv2.Mat, np.ndarray]) -> None:
         """
         Display all tracked boxes on the given frame.
 

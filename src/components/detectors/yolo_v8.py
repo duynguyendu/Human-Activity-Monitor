@@ -1,8 +1,9 @@
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from functools import partial
 
-from cv2.typing import MatLike
+import numpy as np
 import torch
+import cv2
 
 from ultralytics import YOLO
 
@@ -37,7 +38,7 @@ class YoloV8:
         self.model = YOLO(weight if weight else "weights/yolov8x.pt").to(self.device)
         self.config = {"conf": conf, "iou": iou, "imgsz": size, "half": half}
 
-    def __call__(self, image: MatLike) -> List[Tuple]:
+    def __call__(self, image: Union[cv2.Mat, np.ndarray]) -> List[Tuple]:
         """
         Forward pass of the model
 
@@ -49,7 +50,7 @@ class YoloV8:
         """
         return self.forward(image)
 
-    def forward(self, image: MatLike) -> List[Tuple]:
+    def forward(self, image: Union[cv2.Mat, np.ndarray]) -> List[Tuple]:
         """
         Forward pass of the model
 
