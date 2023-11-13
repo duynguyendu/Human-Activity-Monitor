@@ -1,9 +1,9 @@
 from functools import cached_property
-from typing import Tuple, Generator
+from typing import Tuple, Union
 from pathlib import Path
 import os
 
-from cv2.typing import MatLike
+import numpy as np
 import cv2
 
 from src.modules.utils import tuple_handler
@@ -42,7 +42,7 @@ class Video:
         self.current_frame = None
         return self
 
-    def __next__(self) -> MatLike:
+    def __next__(self) -> Union[cv2.Mat, np.ndarray]:
         """
         Get the next frame from the video.
 
@@ -203,6 +203,55 @@ class Video:
             pt2=tuple_handler(bottom_right, max_dim=2),
             color=tuple_handler(color, max_dim=3),
             thickness=int(thickness),
+        )
+
+    def add_circle(
+        self,
+        center: Tuple,
+        radius: int,
+        color: Tuple = (255, 255, 255),
+        thickness: int = 1,
+    ) -> None:
+        """
+        Add a circle to the current frame.
+
+        Args:
+            center (Tuple): Center coordinates (x, y).
+            radius (int): Circle radius.
+            color (Tuple, optional): Color of the rectangle (B, G, R). Defaults to (255, 255, 255).
+            thickness (int, optional): Thickness of the rectangle outline. Defaults to 1.
+
+        Returns:
+            None
+        """
+        cv2.circle(
+            img=self.current_frame,
+            center=tuple_handler(center, max_dim=2),
+            radius=int(radius),
+            color=tuple_handler(color, max_dim=3),
+            thickness=int(thickness),
+        )
+
+    def add_point(
+        self, center: Tuple, radius: int, color: Tuple = (255, 255, 255)
+    ) -> None:
+        """
+        Add a point to the current frame.
+
+        Args:
+            center (Tuple): Center coordinates (x, y).
+            radius (int): Circle radius.
+            color (Tuple, optional): Color of the rectangle (B, G, R). Defaults to (255, 255, 255).
+
+        Returns:
+            None
+        """
+        cv2.circle(
+            img=self.current_frame,
+            center=tuple_handler(center, max_dim=2),
+            radius=int(radius),
+            color=tuple_handler(color, max_dim=3),
+            thickness=-1,
         )
 
     def add_text(
