@@ -1,9 +1,6 @@
 from typing import Tuple, Union
-from functools import partial
-import random
 
 import cupy as cp
-import cv2
 
 from src.modules.utils import tuple_handler
 
@@ -28,15 +25,22 @@ class Box:
             bottom_right (Tuple): Bottom-right corner coordinates (x, y).
             smoothness (int, optional): Number of frames for smoothing. Defaults to 1.
         """
-        self.tl = top_left
-        self.br = bottom_right
+        self.xyxy = (*top_left, *bottom_right)
         self.smoothness = smoothness
-        self.draw_box = self.config_box(color, box_thickness)
-        self.add_text = self.config_text(
-            text_pos_adjust, font_scale, color, text_thickness
-        )
         self.history = list()
         self.count = 0
+        self.box_config = {
+            "top_left": top_left,
+            "bottom_right": bottom_right,
+            "color": color,
+            "thickness": box_thickness,
+        }
+        self.text_config = {
+            "pos": tuple(x + y for x, y in zip(top_left, text_pos_adjust)),
+            "font_scale": font_scale,
+            "color": color,
+            "thickness": text_thickness,
+        }
 
     def check(self, pos: Tuple) -> None:
         """
@@ -45,56 +49,12 @@ class Box:
         Args:
             pos (Tuple): Position coordinates (x, y).
         """
-        x1, y1 = self.tl
-        x2, y2 = self.br
+        x1, y1, x2, y2 = self.xyxy
 
         X, Y = tuple_handler(pos, max_dim=2)
 
         if (x1 <= X <= x2) and (y1 <= Y <= y2):
             self.count += 1
-
-    def config_box(self, color: Tuple = 0, thickness: int = 1):
-        """
-        Configure box drawing parameters.
-
-        Args:
-            color (Tuple, optional): Color of the box (B, G, R). Defaults to 0.
-            thickness (int, optional): Thickness of the box outline. Defaults to 1.
-        """
-        return partial(
-            cv2.rectangle,
-            pt1=tuple_handler(self.tl, max_dim=2),
-            pt2=tuple_handler(self.br, max_dim=2),
-            color=tuple_handler(color, max_dim=3),
-            thickness=int(thickness),
-        )
-
-    def config_text(
-        self,
-        pos_adjust: Tuple = (0, 0),
-        font_scale: int = 1,
-        color: Tuple = 0,
-        thickness: int = 1,
-    ):
-        """
-        Configure text drawing parameters.
-
-        Args:
-            pos_adjust (Tuple, optional): Text position adjustment (x, y). Defaults to (0, 0).
-            font_scale (int, optional): Font scale for the text. Defaults to 1.
-            color (Tuple, optional): Color of the text (B, G, R). Defaults to 0.
-            thickness (int, optional): Thickness of the text. Defaults to 1.
-        """
-        return partial(
-            cv2.putText,
-            org=tuple(
-                x + y for x, y in zip(self.tl, tuple_handler(pos_adjust, max_dim=2))
-            ),
-            fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-            fontScale=int(font_scale),
-            color=tuple_handler(color, max_dim=3),
-            thickness=int(thickness),
-        )
 
     def get_value(self) -> int:
         """
@@ -108,16 +68,6 @@ class Box:
             self.history.pop(0)
         self.count = 0
         return int(cp.mean(cp.array(self.history)))
-
-    def show(self, frame: Union[cv2.Mat, cp.ndarray]):
-        """
-        Display the box and text on the given frame.
-
-        Args:
-            frame (MatLike): Icput image frame.
-        """
-        self.draw_box(img=frame)
-        self.add_text(img=frame, text=str(self.get_value()))
 
 
 class TrackBox:
@@ -183,12 +133,3 @@ class TrackBox:
             pos (Tuple): Position coordinates (x, y).
         """
         [box["box"].check(pos) for box in self.BOXES]
-
-    def show(self, frame: Union[cv2.Mat, cp.ndarray]) -> None:
-        """
-        Display all tracked boxes on the given frame.
-
-        Args:
-            frame (MatLike): Icput image frame.
-        """
-        [box["box"].show(frame) for box in self.BOXES]

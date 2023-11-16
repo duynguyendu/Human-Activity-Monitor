@@ -195,7 +195,9 @@ def main(cfg: DictConfig) -> None:
 
         # Show track box
         if cfg["features"]["track_box"]:
-            track_box.show(frame)
+            for data in track_box.BOXES:
+                VIDEO.add_box(**data["box"].box_config)
+                VIDEO.add_text(text=data["box"].get_value(), **data["box"].text_config)
 
         # Show main video
         VIDEO.show()
