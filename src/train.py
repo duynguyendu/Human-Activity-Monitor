@@ -88,7 +88,7 @@ def main(cfg: DictConfig) -> None:
         max_epochs=cfg["trainer"]["num_epoch"],
         precision=cfg["trainer"]["precision"],
         callbacks=custom_callbacks(),
-        logger=TensorBoardLogger(save_dir="logs", name="new"),
+        logger=TensorBoardLogger(save_dir="logs"),
     )
 
     # Training
