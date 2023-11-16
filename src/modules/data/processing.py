@@ -330,41 +330,40 @@ class ImagePreparation:
             ),
         )
 
-        # Process if save path is not existed
-        if not os.path.exists(self.save_path) or remake:
-            # Delete the old one if remake
-            shutil.rmtree(self.save_path) if remake else None
+        if os.path.exists(self.save_path):
+            if remake:
+                shutil.rmtree(self.save_path)
+            else:
+                print("[bold]Processing data is already existed.[/]")
+                return
 
-            # Process summary
-            print(f"\n[bold]Summary:[/]")
-            print(f"  Remake: {remake}")
-            print(f"  Number of workers: {self.workers}")
-            print(f"  Data path: [green]{self.data_path}[/]")
-            print(f"  Save path: [green]{self.save_path}[/]")
+        # Process summary
+        print(f"\n[bold]Summary:[/]")
+        print(f"  Remake: {remake}")
+        print(f"  Number of workers: {self.workers}")
+        print(f"  Data path: [green]{self.data_path}[/]")
+        print(f"  Save path: [green]{self.save_path}[/]")
 
-            # Calcute chunksize base on cpu parallel power
-            benchmark = lambda x: max(
-                1, round(len(x) / (self.workers * psutil.cpu_freq().max / 1000) / 4)
-            )
+        # Calcute chunksize base on cpu parallel power
+        benchmark = lambda x: max(
+            1, round(len(x) / (self.workers * psutil.cpu_freq().max / 1000) / 4)
+        )
 
-            # Split data
-            print("\n[bold][yellow]Splitting data...[/][/]")
-            class_folders = os.listdir(self.data_path)
-            process_map(
-                self._split_data,
-                class_folders,
-                max_workers=self.workers,
-                chunksize=benchmark(class_folders),
-            )
+        # Split data
+        print("\n[bold][yellow]Splitting data...[/][/]")
+        class_folders = os.listdir(self.data_path)
+        process_map(
+            self._split_data,
+            class_folders,
+            max_workers=self.workers,
+            chunksize=benchmark(class_folders),
+        )
 
-            # Save configuration
-            print("\n[bold][yellow]Saving config...[/][/]")
-            self._save_config(os.path.join(self.save_path, "config.yaml"))
+        # Save configuration
+        print("\n[bold][yellow]Saving config...[/][/]")
+        self._save_config(os.path.join(self.save_path, "config.yaml"))
 
-            print("\n[bold][green]Processing data complete.[/][/]")
-
-        else:
-            print("[bold]Processing data is already existed.[/]")
+        print("\n[bold][green]Processing data complete.[/][/]")
 
 
 class VideoPreparation:
@@ -574,54 +573,53 @@ class VideoPreparation:
             ),
         )
 
-        # Process if save path is not existed or remake
-        if not os.path.exists(self.save_path) or remake:
-            # Delete the old one if remake
-            shutil.rmtree(self.save_path) if remake else None
+        if os.path.exists(self.save_path):
+            if remake:
+                shutil.rmtree(self.save_path)
+            else:
+                print("[bold]Processing data is already existed.[/]")
+                return
 
-            # Process summary
-            print(f"\n[bold]Summary:[/]")
-            print(f"  Remake: {remake}")
-            print(f"  Number of workers: {self.workers}")
-            print(f"  Data path: [green]{self.data_path}[/]")
-            print(f"  Save path: [green]{self.save_path}[/]")
+        # Process summary
+        print(f"\n[bold]Summary:[/]")
+        print(f"  Remake: {remake}")
+        print(f"  Number of workers: {self.workers}")
+        print(f"  Data path: [green]{self.data_path}[/]")
+        print(f"  Save path: [green]{self.save_path}[/]")
 
-            # Calcute chunksize base on cpu parallel power
-            benchmark = lambda x: max(
-                1, round(len(x) / (self.workers * psutil.cpu_freq().max / 1000) / 4)
-            )
+        # Calcute chunksize base on cpu parallel power
+        benchmark = lambda x: max(
+            1, round(len(x) / (self.workers * psutil.cpu_freq().max / 1000) / 4)
+        )
 
-            # Split data
-            print("\n[bold][yellow]Splitting data...[/][/]")
-            class_folders = os.listdir(self.data_path)
-            process_map(
-                self._split_data,
-                class_folders,
-                max_workers=self.workers,
-                chunksize=benchmark(class_folders),
-            )
+        # Split data
+        print("\n[bold][yellow]Splitting data...[/][/]")
+        class_folders = os.listdir(self.data_path)
+        process_map(
+            self._split_data,
+            class_folders,
+            max_workers=self.workers,
+            chunksize=benchmark(class_folders),
+        )
 
-            # Generate data
-            print("\n[bold][yellow]Generating data...[/][/]")
-            video_paths = [
-                str(video)
-                for ext in self.extensions
-                for video in Path(self.temp_path).rglob("*" + ext)
-            ]
-            process_map(
-                self._frame_generate,
-                video_paths,
-                max_workers=self.workers,
-                chunksize=benchmark(video_paths),
-            )
+        # Generate data
+        print("\n[bold][yellow]Generating data...[/][/]")
+        video_paths = [
+            str(video)
+            for ext in self.extensions
+            for video in Path(self.temp_path).rglob("*" + ext)
+        ]
+        process_map(
+            self._frame_generate,
+            video_paths,
+            max_workers=self.workers,
+            chunksize=benchmark(video_paths),
+        )
 
-            # Save configuration
-            print("\n[bold][yellow]Saving config...[/][/]")
-            self._save_config(os.path.join(self.save_path, "config.yaml"))
+        # Save configuration
+        print("\n[bold][yellow]Saving config...[/][/]")
+        self._save_config(os.path.join(self.save_path, "config.yaml"))
 
-            # Remove temp folder
-            shutil.rmtree(self.temp_path) if not self.keep_temp else None
-            print("\n[bold][green]Processing data complete.[/][/]")
-
-        else:
-            print("[bold]Processing data is already existed.[/]")
+        # Remove temp folder
+        shutil.rmtree(self.temp_path) if not self.keep_temp else None
+        print("\n[bold][green]Processing data complete.[/][/]")
