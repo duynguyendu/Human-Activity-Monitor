@@ -4,7 +4,7 @@
 classifier:
   model:
     # Model weight path
-    checkpoint: weights/epoch=23-step=1344.ckpt
+    checkpoint: weights/70k_0.84.ckpt
 
     # Use half-precision (float16) instead of float32 for inference
     half: true

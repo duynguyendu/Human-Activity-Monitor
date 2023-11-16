@@ -2,7 +2,7 @@ from typing import Tuple, Union
 from functools import partial
 import random
 
-import numpy as np
+import cupy as cp
 import cv2
 
 from src.modules.utils import tuple_handler
@@ -10,7 +10,15 @@ from src.modules.utils import tuple_handler
 
 class Box:
     def __init__(
-        self, top_left: Tuple, bottom_right: Tuple, smoothness: int = 1
+        self,
+        top_left: Tuple,
+        bottom_right: Tuple,
+        smoothness: int,
+        color: Tuple,
+        box_thickness: int,
+        text_pos_adjust: Tuple,
+        font_scale: int,
+        text_thickness: int,
     ) -> None:
         """
         Initialize a box with given top-left and bottom-right coordinates.
@@ -23,8 +31,10 @@ class Box:
         self.tl = top_left
         self.br = bottom_right
         self.smoothness = smoothness
-        self.config_box()
-        self.config_text()
+        self.draw_box = self.config_box(color, box_thickness)
+        self.add_text = self.config_text(
+            text_pos_adjust, font_scale, color, text_thickness
+        )
         self.history = list()
         self.count = 0
 
@@ -43,19 +53,6 @@ class Box:
         if (x1 <= X <= x2) and (y1 <= Y <= y2):
             self.count += 1
 
-    def get_value(self) -> int:
-        """
-        Get the smoothed count value.
-
-        Returns:
-            int: Smoothed count value.
-        """
-        self.history.append(self.count)
-        if len(self.history) > self.smoothness:
-            self.history.pop(0)
-        self.count = 0
-        return int(np.mean(self.history))
-
     def config_box(self, color: Tuple = 0, thickness: int = 1):
         """
         Configure box drawing parameters.
@@ -64,7 +61,7 @@ class Box:
             color (Tuple, optional): Color of the box (B, G, R). Defaults to 0.
             thickness (int, optional): Thickness of the box outline. Defaults to 1.
         """
-        self.draw_box = partial(
+        return partial(
             cv2.rectangle,
             pt1=tuple_handler(self.tl, max_dim=2),
             pt2=tuple_handler(self.br, max_dim=2),
@@ -88,7 +85,7 @@ class Box:
             color (Tuple, optional): Color of the text (B, G, R). Defaults to 0.
             thickness (int, optional): Thickness of the text. Defaults to 1.
         """
-        self.add_text = partial(
+        return partial(
             cv2.putText,
             org=tuple(
                 x + y for x, y in zip(self.tl, tuple_handler(pos_adjust, max_dim=2))
@@ -99,24 +96,36 @@ class Box:
             thickness=int(thickness),
         )
 
-    def show(self, frame: Union[cv2.Mat, np.ndarray]):
+    def get_value(self) -> int:
+        """
+        Get the smoothed count value.
+
+        Returns:
+            int: Smoothed count value.
+        """
+        self.history.append(self.count)
+        if len(self.history) > self.smoothness:
+            self.history.pop(0)
+        self.count = 0
+        return int(cp.mean(cp.array(self.history)))
+
+    def show(self, frame: Union[cv2.Mat, cp.ndarray]):
         """
         Display the box and text on the given frame.
 
         Args:
-            frame (MatLike): Input image frame.
+            frame (MatLike): Icput image frame.
         """
         self.draw_box(img=frame)
         self.add_text(img=frame, text=str(self.get_value()))
 
 
 class TrackBox:
-    BOXES = list()
+    def __init__(self, **kwargs) -> None:
+        self.default_config = kwargs
+        self.BOXES = list()
 
-    @classmethod
-    def new(
-        cls, name: str, top_left: Tuple, bottom_right: Tuple, smoothness: int = 1
-    ) -> "Box":
+    def new(self, **kwargs) -> "Box":
         """
         Create a new tracked box.
 
@@ -129,12 +138,12 @@ class TrackBox:
         Returns:
             Box: The created box.
         """
-        box = Box(top_left, bottom_right, smoothness)
-        cls.BOXES.append({"name": str(name), "box": box})
+        kwargs.update((k, v) for k, v in self.default_config.items() if k not in kwargs)
+        box = {"name": str(kwargs.pop("name")), "box": Box(**kwargs)}
+        self.BOXES.append(box)
         return box
 
-    @classmethod
-    def get(cls, name: str) -> Union["Box", None]:
+    def get(self, name: str) -> Union["Box", None]:
         """
         Get a box by name.
 
@@ -144,14 +153,13 @@ class TrackBox:
         Returns:
             Union[Box, None]: The box if found, otherwise None.
         """
-        for box in cls.BOXES:
+        for box in self.BOXES:
             if str(name) == box["name"]:
                 return box["box"]
         else:
             return None
 
-    @classmethod
-    def remove(cls, name: str) -> None:
+    def remove(self, name: str) -> None:
         """
         Remove a box by name.
 
@@ -161,60 +169,26 @@ class TrackBox:
         Raises:
             ValueError: If the box with the specified name is not found.
         """
-        box = cls.get(name)
+        box = self.get(name)
         if box:
-            cls.BOXES.remove({"name": name, "box": box})
+            self.BOXES.remove({"name": name, "box": box})
         else:
             raise ValueError(f"The box named '{name}' was not found")
 
-    @classmethod
-    def config_boxes(
-        cls,
-        color: Tuple = None,
-        box_thickness: int = 1,
-        text_pos_adjust: Tuple = None,
-        font_scale: int = 1,
-        text_thickness: int = 1,
-    ) -> None:
-        """
-        Configure drawing parameters for all tracked boxes.
-
-        Args:
-            color (Tuple, optional): Color of the boxes (B, G, R). If not provided, random colors are assigned.
-            box_thickness (int, optional): Thickness of the box outlines. Defaults to 1.
-            text_pos_adjust (Tuple, optional): Text position adjustment for all boxes (x, y). Defaults to None.
-            font_scale (int, optional): Font scale for the text. Defaults to 1.
-            text_thickness (int, optional): Thickness of the text. Defaults to 1.
-        """
-        default_color = color
-
-        for box in cls.BOXES:
-            if not color:
-                default_color = tuple(random.randint(0, 255) for _ in range(3))
-            box["box"].config_box(color=default_color, thickness=box_thickness)
-            box["box"].config_text(
-                pos_adjust=text_pos_adjust,
-                font_scale=font_scale,
-                color=default_color,
-                thickness=text_thickness,
-            )
-
-    @classmethod
-    def check(cls, pos: Tuple) -> None:
+    def check(self, pos: Tuple) -> None:
         """
         Check if the provided position is within any of the tracked boxes.
 
         Args:
             pos (Tuple): Position coordinates (x, y).
         """
-        [box["box"].check(pos) for box in cls.BOXES]
+        [box["box"].check(pos) for box in self.BOXES]
 
-    @classmethod
-    def show(cls, frame: Union[cv2.Mat, np.ndarray]) -> None:
+    def show(self, frame: Union[cv2.Mat, cp.ndarray]) -> None:
         """
         Display all tracked boxes on the given frame.
 
         Args:
-            frame (MatLike): Input image frame.
+            frame (MatLike): Icput image frame.
         """
-        [box["box"].show(frame) for box in cls.BOXES]
+        [box["box"].show(frame) for box in self.BOXES]

@@ -40,9 +40,10 @@ def main(cfg: DictConfig) -> None:
 
     # Track box
     # Boxes initialize
-    [TrackBox.new(**box) for box in cfg["features"]["track_box"]["boxes"]]
-    # Configure boxes
-    TrackBox.config_boxes(**cfg["features"]["track_box"]["config"])
+    if cfg["features"]["track_box"]:
+        track_box = TrackBox(**cfg["features"]["track_box"]["default"])
+        # Configure boxes
+        [track_box.new(**box) for box in cfg["features"]["track_box"]["boxes"]]
 
     # Config video progress bar
     progress_bar = tqdm(
@@ -169,7 +170,8 @@ def main(cfg: DictConfig) -> None:
             if cfg["detector"]["show"]["human_dot"]:
                 VIDEO.add_point(center=center, radius=5, color=(225, 225, 225))
 
-            TrackBox.check(pos=center)
+            if cfg["features"]["track_box"]:
+                track_box.check(pos=center)
 
             # Classify action
             if cfg["classifier"]:
@@ -192,7 +194,8 @@ def main(cfg: DictConfig) -> None:
                 )
 
         # Show track box
-        TrackBox.show(frame)
+        if cfg["features"]["track_box"]:
+            track_box.show(frame)
 
         # Show main video
         VIDEO.show()

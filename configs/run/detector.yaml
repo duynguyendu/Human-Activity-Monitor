@@ -8,10 +8,10 @@ detector:
     weight: weights/yolov8m.pt
 
     # Confidence threshold for detection
-    conf: 0.25
+    conf: 0.35
 
     # Intersection over Union
-    iou: 0.7
+    iou: 0.5
 
     # Input size for the model
     size: 640
