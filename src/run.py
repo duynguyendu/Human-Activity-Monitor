@@ -88,6 +88,7 @@ def main(cfg: DictConfig) -> None:
                         human_count_cfg["save"]["save_name"] + ".csv",
                     ),
                     interval=human_count_cfg["save"]["interval"],
+                    fps=VIDEO.fps,
                     speed=cfg["video"]["speed"],
                 )
 

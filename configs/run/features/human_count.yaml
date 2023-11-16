@@ -11,5 +11,5 @@ human_count:
     save_path: records/
     save_name: human_count
 
-    # Frequency (frame)
-    interval: 30
+    # Frequency (second)
+    interval: 1

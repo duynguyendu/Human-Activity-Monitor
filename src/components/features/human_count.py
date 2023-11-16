@@ -38,15 +38,20 @@ class HumanCount:
             self.history.pop(0)
 
         if hasattr(self, "save_conf"):
-            current = int(self.save_conf["count"] * self.save_conf["speed"])
+            current = (
+                int(self.save_conf["count"] * self.save_conf["speed"])
+                / self.save_conf["fps"]
+            )
             if self.save_conf["count"] != 0:
                 if (current % self.save_conf["interval"]) == 0:
                     with open(self.save_conf["save_path"], "a") as f:
-                        f.write(f"{current},{self.get_value()}\n")
+                        f.write(f"{int(current)},{self.get_value()}\n")
 
             self.save_conf["count"] += 1
 
-    def save_config(self, save_path: str, interval: int, speed: int = 1) -> None:
+    def save_config(
+        self, save_path: str, interval: int, fps: int, speed: int = 1
+    ) -> None:
         """
         Configurate save
 
@@ -63,11 +68,12 @@ class HumanCount:
         save_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(save_path, "w") as f:
-            f.write("frame,value" + "\n")
+            f.write("second,value" + "\n")
 
         self.save_conf = {
             "save_path": save_path,
             "count": 0,
             "interval": interval,
+            "fps": fps,
             "speed": max(1, speed),
         }
