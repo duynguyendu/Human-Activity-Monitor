@@ -218,8 +218,8 @@ class Video:
         Args:
             center (Tuple): Center coordinates (x, y).
             radius (int): Circle radius.
-            color (Tuple, optional): Color of the rectangle (B, G, R). Defaults to (255, 255, 255).
-            thickness (int, optional): Thickness of the rectangle outline. Defaults to 1.
+            color (Tuple, optional): Color of the circle (B, G, R). Defaults to (255, 255, 255).
+            thickness (int, optional): Thickness of the circle outline. Defaults to 1.
 
         Returns:
             None
@@ -241,7 +241,7 @@ class Video:
         Args:
             center (Tuple): Center coordinates (x, y).
             radius (int): Circle radius.
-            color (Tuple, optional): Color of the rectangle (B, G, R). Defaults to (255, 255, 255).
+            color (Tuple, optional): Color of the point (B, G, R). Defaults to (255, 255, 255).
 
         Returns:
             None
