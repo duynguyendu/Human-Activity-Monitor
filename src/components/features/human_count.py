@@ -58,6 +58,8 @@ class HumanCount:
         Args:
             save_path (str): Path to save output
             interval (int): Save every n (second)
+            fps (int): Frame per second of the video
+            speed (int): Video speed multiplying
 
         Returns:
             None

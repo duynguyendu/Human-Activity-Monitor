@@ -5,7 +5,7 @@ video:
   # Path to video
   path: ???
 
-  # Video speed multiplied
+  # Video speed multiplying
   speed: 1
 
   # Frame delay (millisecond)

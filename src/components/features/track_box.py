@@ -20,10 +20,15 @@ class Box:
         """
         Initialize a box with given top-left and bottom-right coordinates.
 
-        Args:
+         Args:
             top_left (Tuple): Top-left corner coordinates (x, y).
             bottom_right (Tuple): Bottom-right corner coordinates (x, y).
-            smoothness (int, optional): Number of frames for smoothing. Defaults to 1.
+            smoothness (int): Number of frames for smoothing. Defaults to 1.
+            color (Tuple): RGB values representing the color of the box and text.
+            box_thickness (int): Thickness of the box border.
+            text_pos_adjust (Tuple): Adjustment to the top-left corner for text positioning.
+            font_scale (int): Font scale for the displayed text.
+            text_thickness (int): Thickness of the text.
         """
         self.xyxy = (*top_left, *bottom_right)
         self.smoothness = smoothness
@@ -72,6 +77,17 @@ class Box:
 
 class TrackBox:
     def __init__(self, **kwargs) -> None:
+        """
+        Initialize a TrackBox class with given default configuration
+
+        Args:
+            smoothness (int): Number of frames for smoothing. Defaults to 1.
+            color (Tuple): RGB values representing the color of the box and text.
+            box_thickness (int): Thickness of the box border.
+            text_pos_adjust (Tuple): Adjustment to the top-left corner for text positioning.
+            font_scale (int): Font scale for the displayed text.
+            text_thickness (int): Thickness of the text.
+        """
         self.default_config = kwargs
         self.BOXES = list()
 
@@ -84,6 +100,11 @@ class TrackBox:
             top_left (Tuple): Top-left corner coordinates (x, y).
             bottom_right (Tuple): Bottom-right corner coordinates (x, y).
             smoothness (int, optional): Number of frames for smoothing. Defaults to 1.
+            color (Tuple, optional): RGB values representing the color of the box and text.
+            box_thickness (int, optional): Thickness of the box border.
+            text_pos_adjust (Tuple, optional): Adjustment to the top-left corner for text positioning.
+            font_scale (int, optional): Font scale for the displayed text.
+            text_thickness (int, optional): Thickness of the text.
 
         Returns:
             Box: The created box.
