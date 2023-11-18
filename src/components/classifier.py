@@ -5,11 +5,10 @@ from torch.nn import Module
 from rich import print
 import torch
 
-from modules.model import LitModel
-from models import ViT as vit
+from src.modules.utils import device_handler
 
 
-class ViT:
+class Classifier:
     CLASSES = ["idle", "laptop", "phone", "walk"]
 
     def __init__(
@@ -34,20 +33,15 @@ class ViT:
         self.ckpt = checkpoint
 
         # Determine the device based on user input or availability
-        if device == "auto":
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.device = device
+        self.device = device_handler(device)
 
-        # Create an instance of the LitModel using the specified architecture and checkpoint
-        self.model = LitModel(
-            model=vit("B_32", num_classes=len(self.CLASSES)), checkpoint=self.ckpt
-        )
+        self.model = torch.load(self.ckpt)
 
         # Apply half-precision if specified
         if half:
             if self.device == "cpu":
                 print(
-                    "[yellow][WARNING] ViT: Half is only supported on CUDA. Using default float32.[/]"
+                    "[yellow][WARNING] [Classifier]: Half is only supported on CUDA. Using default float32.[/]"
                 )
                 half = False
             else:
