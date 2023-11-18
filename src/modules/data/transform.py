@@ -3,7 +3,7 @@ from typing import Tuple
 import torchvision.transforms as T
 from torch import Tensor
 
-from modules.utils import tuple_handler
+from src.modules.utils import tuple_handler
 
 
 __all__ = ["DataTransformation"]

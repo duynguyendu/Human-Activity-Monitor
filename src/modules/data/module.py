@@ -7,8 +7,8 @@ from lightning.pytorch import LightningDataModule
 
 from rich import print
 
-from modules.data import DataTransformation
-from modules.utils import workers_handler
+from src.modules.data import DataTransformation
+from src.modules.utils import workers_handler
 
 
 __all__ = ["CustomDataModule"]
