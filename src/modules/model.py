@@ -9,6 +9,8 @@ import torch
 from lightning.pytorch import LightningModule
 from rich import print
 
+from .utils import device_handler
+
 
 class LitModel(LightningModule):
     def __init__(
@@ -18,12 +20,13 @@ class LitModel(LightningModule):
         optimizer: optim.Optimizer | Dict = None,
         scheduler: optim.Optimizer = None,
         checkpoint: str = None,
+        device: str = "auto",
     ):
         """
         Initialize the Lightning Model.
 
         Args:
-            model (nn.Module): The neural network model to be trained.
+            model (nn.Module): The neural network model to be trained. Default: None
             criterion (nn.Module, optional): The loss function. Default: None
             optimizer (optim.Optimizer | Dict, optional): The optimizer or optimizer configuration. Default: None
             scheduler (optim.Optimizer, optional): The learning rate scheduler. Default: None
@@ -35,7 +38,7 @@ class LitModel(LightningModule):
         self.optimizer = optimizer
         self.scheduler = scheduler
         if checkpoint:
-            self.load(checkpoint)
+            self.load(checkpoint, device=device)
 
     def forward(self, X):
         return self.model(X)
@@ -78,15 +81,19 @@ class LitModel(LightningModule):
         loss = self.criterion(y_hat, y)
         self._log(stage="test", loss=loss, y_hat=y_hat, y=y)
 
-    def load(self, path: str, strict: bool = True, verbose: bool = True):
+    def load(
+        self, path: str, strict: bool = True, device: str = "auto", verbose: bool = True
+    ):
         if not os.path.exists(path):
             raise FileNotFoundError(path)
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        print("[bold]Load checkpoint:[/] Loading...") if verbose else None
         self.load_state_dict(
-            state_dict=torch.load(path, map_location=device)["state_dict"],
+            state_dict=torch.load(path, map_location=device_handler(device))[
+                "state_dict"
+            ],
             strict=strict,
         )
-        print("[bold]Load checkpoint:[/] Done") if verbose else None
+        print("[bold]Load checkpoint:[/] Done      ") if verbose else None
 
     def save_hparams(self, config: Dict) -> None:
         self.hparams.update(config)
