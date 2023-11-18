@@ -11,13 +11,16 @@ detector:
     conf: 0.35
 
     # Intersection over Union
-    iou: 0.5
+    iou: 0.4
 
     # Input size for the model
     size: 640
 
-    # Use half precision (float16) for inference
+    # Use half precision (float16) for better inference
     half: true
+
+    # Fuse model layer
+    fuse: true
 
     # Enable tracking
     track: false

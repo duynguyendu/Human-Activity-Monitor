@@ -3,20 +3,22 @@ from functools import partial
 
 from rich import print
 import numpy as np
-import torch
 import cv2
 
 from ultralytics import YOLO
 
+from src.modules.utils import device_handler
 
-class YoloV8:
+
+class Detector:
     def __init__(
         self,
         weight: str = None,
         conf: float = 0.25,
         iou: float = 0.7,
-        size: int | Tuple = 640,
+        size: Union[int, Tuple] = 640,
         half: bool = False,
+        fuse: bool = False,
         track: bool = False,
         device: str = "auto",
     ):
@@ -29,19 +31,20 @@ class YoloV8:
             iou (float, optional): Intersection over Union (IoU) threshold. Defaults to 0.3.
             size (int or Tuple, optional): Input size for the YOLO model. Defaults to 640.
             half (bool, optional): Use half precision (float16) for inference. Defaults to False.
+            fuse (bool, optional): Fuse model layer. Defaults to False.
             track (bool, optional): Enable object tracking. Defaults to False.
             device (str, optional): Device to run the model ('auto', 'cuda', or 'cpu'). Defaults to "auto".
         """
-        if device == "auto":
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.device = device
+        self.device = device_handler(device)
         self.track = track
         self.model = YOLO(weight if weight else "weights/yolov8x.pt").to(self.device)
         if half and device == "cpu":
             print(
-                "[yellow][WARNING] Yolo-v8: Half is only supported on CUDA. Using default float32.[/]"
+                "[yellow][WARNING] [YOLOv8]: Half is only supported on CUDA. Using default float32.[/]"
             )
             half = False
+        if fuse:
+            self.model.fuse()
         self.config = {"conf": conf, "iou": iou, "imgsz": size, "half": half}
 
     def __call__(self, image: Union[cv2.Mat, np.ndarray]) -> List[Tuple]:
