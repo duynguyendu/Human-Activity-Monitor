@@ -13,10 +13,9 @@ from rootutils import autosetup
 autosetup()
 
 from modules.data.transform import DataTransformation
-from components.detectors.yolo_v8 import YoloV8
-from components.classifiers.vit import ViT
-from components.features import *
 from modules.video import Video
+from components.features import *
+from components import *
 
 
 @hydra.main(config_path="../configs/run", config_name="run", version_base="1.3")
@@ -26,14 +25,14 @@ def main(cfg: DictConfig) -> None:
 
     # Define main componets
     # Detector
-    DETECTOR = YoloV8(**cfg["detector"]["model"], device=cfg["device"])
+    DETECTOR = Detector(**cfg["detector"]["model"], device=cfg["device"])
 
     if cfg["classifier"]:
         # Transform
         TRANSFORM = DataTransformation.TOPIL(image_size=cfg["classifier"]["image_size"])
 
         # Classifier
-        CLASSIFIER = ViT(**cfg["classifier"]["model"], device=cfg["device"])
+        CLASSIFIER = Classifier(**cfg["classifier"]["model"], device=cfg["device"])
 
     # Load video
     VIDEO = Video(path=cfg["video"]["path"])
