@@ -1,8 +1,44 @@
 from typing import Union, Tuple, List
 import os
 
+import torch
 
-__all__ = ["workers_handler", "tuple_handler"]
+
+__all__ = ["device_handler", "workers_handler", "tuple_handler"]
+
+
+def device_handler(value: str = "auto") -> str:
+    """
+    Handles the specification of device choice.
+
+    Args:
+        value (str): The device specification. Valid options: ["auto", "cpu", "cuda"]. Default to "auto"
+
+    Returns:
+        str: The selected device string.
+
+    Example:
+        >>> device_handler("auto")
+        'cuda'  # Returns 'cuda' if GPU is available, otherwise 'cpu'
+    """
+    # Check type
+    if not isinstance(value, str):
+        raise TypeError(
+            f"The 'value' parameter must be a string. Got {type(value)} instead."
+        )
+    # Prepare
+    value = value.strip().lower()
+    # Check value
+    if not (value in ["auto", "gpu", "cpu"] or value.startswith("cuda")):
+        raise ValueError(
+            f'Device options: ["auto", "cpu", "cuda"]. Got {value} instead.'
+        )
+    # Check auto option
+    if value == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    else:
+        device = value
+    return device
 
 
 def workers_handler(value: Union[int, float]) -> int:
