@@ -9,8 +9,8 @@ classifier:
     # Use half-precision (float16) instead of float32 for inference
     half: true
 
-    # TorchDynamo, the latest method to speed up PyTorch code
-    dynamo: true
+    # Use TorchDynamo, the latest method to speed up PyTorch code
+    optimize: true
 
   # Size of image for the inference
   image_size: 224

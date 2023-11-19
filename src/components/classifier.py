@@ -16,7 +16,7 @@ class Classifier:
         checkpoint: str,
         device: str = "auto",
         half: bool = False,
-        dynamo: bool = False,
+        optimize: bool = False,
     ):
         """
         Initialize the class.
@@ -25,7 +25,7 @@ class Classifier:
             - checkpoint (str): Path to the model checkpoint.
             - device (str, optional): Device to use ("auto", "cuda", or "cpu"). Defaults to "auto".
             - half (bool, optional): Use half-precision (float16). Defaults to False.
-            - dynamo (bool, optional): Use TorchDynamo for GPU acceleration. Defaults to False.
+            - optimize (bool, optional): Use TorchDynamo for model optimization. Defaults to False.
         """
         # Check if the provided checkpoint path exists
         if not os.path.exists(checkpoint):
@@ -48,7 +48,7 @@ class Classifier:
                 self.model = self.__half(self.model)
 
         # Apply TorchDynamo compilation if specified
-        if dynamo:
+        if optimize:
             self.model = self.__compile(self.model)
 
         # Store configuration options
