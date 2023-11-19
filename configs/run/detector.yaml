@@ -7,6 +7,9 @@ detector:
     # Model weight path
     weight: weights/yolov8m.pt
 
+    # Enable tracking
+    track: false
+
     # Confidence threshold for detection
     conf: 0.35
 
@@ -22,8 +25,14 @@ detector:
     # Fuse model layer
     fuse: true
 
-    # Enable tracking
-    track: false
+    # Using onnx model
+    onnx: false
+
+    # Use TorchDynamo, the latest method to speed up PyTorch code
+    optimize: true
+
+    # Backend to be used for model optimization
+    backend: null
 
   # Draw output
   show:
