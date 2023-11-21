@@ -14,11 +14,16 @@ video:
   # Video resolution
   resolution: [ 1280, 720 ]
 
-  # Save output
-  save:
-    # Save path and name
-    save_path: records/
-    save_name: output
+# Save output
+record:
+  # Save path
+  save_path: records/
 
-    # Output resolution
-    resolution: [ 1024, 576 ]
+  # Save name
+  save_name: output
+
+  # Custom fps (null for auto)
+  fps: null
+
+  # Output resolution
+  resolution: [ 1024, 576 ]

@@ -1,24 +1,37 @@
 from functools import cached_property
 from typing import Tuple, Union
 from pathlib import Path
+import itertools
 import os
 
+from tqdm import tqdm
 import numpy as np
 import cv2
 
 from src.modules.utils import tuple_handler
-
-
-__all__ = ["Video"]
+from . import Backbone
 
 
 class Video:
-    def __init__(self, path: str, resolution: Tuple = None) -> None:
+    def __init__(
+        self,
+        path: str,
+        speed: int = 1,
+        delay: int = 1,
+        resolution: Tuple = None,
+        backbone: Backbone = None,
+        progress_bar: bool = True,
+    ) -> None:
         """
         Initializes a Video object.
 
         Args:
             path (str): Path of the video to open.
+            speed (int, optional): Playback speed of the video. Defaults to 1.
+            delay (int, optional): Delay between frames in milliseconds. Defaults to 1.
+            resolution (Tuple, optional): Change resolution of the video.
+            backbone (Backbone, optional): Backbone for video processing. Defaults to None.
+            progress_bar (bool, optional): Display progress bar during video playback. Defaults to True.
 
         Raises:
             FileExistsError: If the file is not found.
@@ -29,7 +42,11 @@ class Video:
             )
         self.video_capture = cv2.VideoCapture(path)
         self.path = path
+        self.speed = speed
+        self.wait = delay
         self.resolution = tuple_handler(resolution, max_dim=2) if resolution else None
+        self.backbone = backbone
+        self.progress_bar = progress_bar
         self.pause = False
 
     def __iter__(self) -> "Video":
@@ -40,6 +57,13 @@ class Video:
             Video: The video object.
         """
         self.current_frame = None
+        self.setup_progress_bar(show=self.progress_bar)
+
+        def generate():
+            for _, frame in iter(self.video_capture.read, (False, None)):
+                yield frame
+
+        self.queue = itertools.islice(generate(), 0, None, self.speed)
         return self
 
     def __next__(self) -> Union[cv2.Mat, np.ndarray]:
@@ -48,15 +72,29 @@ class Video:
 
         Returns:
             MatLike: The next frame.
-
-        Raises:
-            StopIteration: When there are no more frames.
         """
-        ret, frame = self.video_capture.read()
-        if not ret:
-            raise StopIteration
+        frame = next(self.queue)
+
+        # Change video resolution
         if self.resolution:
             frame = cv2.resize(frame, self.resolution)
+
+        # Backbone process
+        if self.backbone:
+            frame = self.backbone.process(frame)
+
+        # Recorder the video
+        if hasattr(self, "recorder"):
+            self.recorder.write(cv2.resize(frame, self.recorder_res))
+
+        # Update progress
+        if (self.progress.n + self.speed) > self.total_frame:
+            # Handle progress overflow
+            self.progress.update(self.total_frame - self.progress.n)
+        else:
+            self.progress.update(self.speed)
+
+        # Return current frame
         self.current_frame = frame
         return self.current_frame
 
@@ -119,6 +157,35 @@ class Video:
         """
         return int(self.cap.get(cv2.CAP_PROP_FPS))
 
+    def setup_progress_bar(self, show: bool) -> None:
+        """
+        Initializes and sets up a progress bar using tqdm.
+
+        Args:
+            show (bool): Flag to determine whether to show the progress bar.
+
+        Returns:
+            None
+        """
+        self.progress = tqdm(
+            disable=not show,
+            total=self.total_frame,
+            desc=f"  {self.name}",
+            unit=" frame",
+            smoothing=0.01,
+            delay=0.1,
+            colour="cyan",
+        )
+
+    def custom_progress_bar(self, tqdm: tqdm) -> None:
+        """
+        Sets a custom tqdm progress bar for the instance.
+
+        Args:
+            tqdm: An instance of the tqdm class representing a custom progress bar.
+        """
+        self.progress = tqdm
+
     def size(self, reverse: bool = False) -> Tuple[int, int]:
         """
         Return video size
@@ -135,48 +202,49 @@ class Video:
         )
         return (w, h) if not reverse else (h, w)
 
-    def delay(self, value: int) -> bool:
+    def record(
+        self,
+        save_path: str = "records",
+        save_name: str = "output",
+        fps: int = None,
+        resolution: Tuple = None,
+        codec: str = "mp4v",
+    ) -> cv2.VideoWriter:
         """
-        Video delay
+        Record the video.
 
         Args:
-            value (int): millisecond
+            save_path (str, optional): Path to store the written video. Defaults to "records".
+            save_name (str, optional): Name of the output video file. Defaults to "output".
+            fps (int, optional): Frames per second for the video. If None, it defaults to the original fps of the source video.
+            resolution (Tuple, optional): Resolution of the video (width, height). If None, it defaults to the original size of the source video.
+            codec (str, optional): Codec for writing the video. Defaults to "mp4v".
 
         Returns:
-            bool: True if continue else False
-        """
-        key = cv2.waitKey(value if not self.pause else 0) & 0xFF
-
-        # Check pause status
-        self.pause = (
-            True if key == ord("p") else False if key == ord("r") else self.pause
-        )
-
-        # Check continue
-        return True if not key == ord("q") else False
-
-    def writer(self, save_path: str, codec: str = "mp4v") -> cv2.VideoWriter:
-        """
-        Create a video writer
-
-        Args:
-            save_path (str): path to store writed video.
-            codec (str, optional): codec for write video. Defaults to "mp4v".
-
-        Returns:
-            cv2.VideoWriter: use to write video
+            cv2.VideoWriter: Object to write video.
         """
         save_path = Path(save_path)
 
         # Create save folder
         save_path.parent.mkdir(parents=True, exist_ok=True)
 
-        return cv2.VideoWriter(
-            filename=str(save_path),
-            fourcc=cv2.VideoWriter_fourcc(*codec),
-            fps=self.fps,
-            frameSize=self.size(),
+        self.recorder_path = os.path.join(save_path, self.stem, save_name + ".mp4")
+
+        self.recorder_fps = int(fps) if fps else self.fps
+
+        self.recorder_res = (
+            tuple_handler(resolution, max_dim=2) if resolution else self.size()
         )
+
+        # Config writer
+        self.recorder = cv2.VideoWriter(
+            filename=self.recorder_path,
+            fourcc=cv2.VideoWriter_fourcc(*codec),
+            fps=self.recorder_fps,
+            frameSize=self.recorder_res,
+        )
+
+        return self.recorder
 
     def add_box(
         self,
@@ -289,6 +357,39 @@ class Video:
         """Show the frame"""
         cv2.imshow(self.stem, self.current_frame)
 
+    def run(self) -> None:
+        """Runs the video playback loop"""
+        for _ in self:
+            self.show()
+
+            if not self.delay(self.wait):
+                break
+
+        self.release()
+
+    def delay(self, value: int) -> bool:
+        """
+        Video delay
+
+        Args:
+            value (int): millisecond
+
+        Returns:
+            bool: True if continue else False
+        """
+        key = cv2.waitKey(value if not self.pause else 0) & 0xFF
+
+        # Check pause status
+        self.pause = (
+            True if key == ord("p") else False if key == ord("r") else self.pause
+        )
+
+        # Check continue
+        return True if not key == ord("q") else False
+
     def release(self) -> None:
         """Release capture"""
         self.video_capture.release()
+        if hasattr(self, "recorder"):
+            self.recorder.release()
+        cv2.destroyWindow(self.stem)
