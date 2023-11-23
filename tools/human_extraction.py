@@ -2,15 +2,16 @@ from skimage.metrics import structural_similarity
 from tqdm import tqdm
 import numpy as np
 import cv2
+import os
 
 # Setup root
-import os, sys
+from rootutils import autosetup
 
-sys.path.extend([os.getcwd(), f"{os.getcwd()}/src"])
+autosetup()
 
-from src.components.detectors.yolo_v8 import YoloV8
 from src.modules.data import ImageProcessing
 from src.modules.utils import tuple_handler
+from src.components import Detector
 
 
 def ssim(image_1, image_2):
@@ -32,7 +33,7 @@ def main():
 
     SAVE_PATH = f"data/processed/{THRESHOLD}"
 
-    MODEL = YoloV8(weight="weights/yolov8x.pt")
+    MODEL = Detector(weight="weights/yolov8x.pt", half=True, fuse=True, optimize=True)
 
     data = sorted(
         os.listdir(PATH),
