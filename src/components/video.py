@@ -1,9 +1,10 @@
 from functools import cached_property
-from typing import Tuple, Union
+from typing import Dict, Tuple, Union
 from pathlib import Path
 import itertools
 import os
 
+from rich import print
 from tqdm import tqdm
 import numpy as np
 import cv2
@@ -19,7 +20,6 @@ class Video:
         speed: int = 1,
         delay: int = 1,
         resolution: Tuple = None,
-        backbone: Backbone = None,
         progress_bar: bool = True,
     ) -> None:
         """
@@ -30,7 +30,6 @@ class Video:
             speed (int, optional): Playback speed of the video. Defaults to 1.
             delay (int, optional): Delay between frames in milliseconds. Defaults to 1.
             resolution (Tuple, optional): Change resolution of the video.
-            backbone (Backbone, optional): Backbone for video processing. Defaults to None.
             progress_bar (bool, optional): Display progress bar during video playback. Defaults to True.
 
         Raises:
@@ -45,7 +44,6 @@ class Video:
         self.speed = speed
         self.wait = delay
         self.resolution = tuple_handler(resolution, max_dim=2) if resolution else None
-        self.backbone = backbone
         self.progress_bar = progress_bar
         self.pause = False
 
@@ -56,14 +54,21 @@ class Video:
         Returns:
             Video: The video object.
         """
-        self.current_frame = None
-        self.setup_progress_bar(show=self.progress_bar)
 
+        # Video iteration generate
         def generate():
             for _, frame in iter(self.video_capture.read, (False, None)):
                 yield frame
 
-        self.queue = itertools.islice(generate(), 0, None, self.speed)
+        # Generate frame queue
+        self.queue = itertools.islice(generate(), 0, None, max(1, self.speed))
+
+        self.setup_progress_bar(show=self.progress_bar)
+
+        print(f"[bold]Video progress:[/]")
+
+        self.current_frame = None
+
         return self
 
     def __next__(self) -> Union[cv2.Mat, np.ndarray]:
@@ -73,19 +78,19 @@ class Video:
         Returns:
             MatLike: The next frame.
         """
-        frame = next(self.queue)
+        self.current_frame = next(self.queue)
 
         # Change video resolution
         if self.resolution:
-            frame = cv2.resize(frame, self.resolution)
+            self.current_frame = cv2.resize(self.current_frame, self.resolution)
 
         # Backbone process
         if self.backbone:
-            frame = self.backbone.process(frame)
+            self.current_frame = self.backbone.apply(self.current_frame)
 
         # Recorder the video
         if hasattr(self, "recorder"):
-            self.recorder.write(cv2.resize(frame, self.recorder_res))
+            self.recorder.write(cv2.resize(self.current_frame, self.recorder_res))
 
         # Update progress
         if (self.progress.n + self.speed) > self.total_frame:
@@ -95,7 +100,6 @@ class Video:
             self.progress.update(self.speed)
 
         # Return current frame
-        self.current_frame = frame
         return self.current_frame
 
     def __len__(self) -> int:
@@ -156,6 +160,15 @@ class Video:
             int: FPS of the video
         """
         return int(self.cap.get(cv2.CAP_PROP_FPS))
+
+    def setup_backbone(self, config: Dict) -> None:
+        """
+        Initializes and sets up backbone for video process.
+
+        Args:
+            config (Dict): Configuration for the backbone
+        """
+        self.backbone = Backbone(video=self, config=config)
 
     def setup_progress_bar(self, show: bool) -> None:
         """
@@ -243,6 +256,8 @@ class Video:
             fps=self.recorder_fps,
             frameSize=self.recorder_res,
         )
+
+        print(f"  [bold]Save recorded video to:[/] [green]{self.recorder_path}.mp4[/]")
 
         return self.recorder
 
@@ -392,4 +407,6 @@ class Video:
         self.video_capture.release()
         if hasattr(self, "recorder"):
             self.recorder.release()
+        if hasattr(self, "backbone"):
+            self.backbone.finish()
         cv2.destroyWindow(self.stem)
