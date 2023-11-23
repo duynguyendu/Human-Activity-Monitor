@@ -40,7 +40,7 @@ detector:
     score: false
 
     # Box surrounding
-    human_box: true
+    box: true
 
     # Central dot
-    human_dot: false
+    dot: false
