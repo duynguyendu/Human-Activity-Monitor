@@ -84,7 +84,7 @@ class Backbone:
         Returns:
             None
         """
-        self.classifier = Classifier(**config["classifier"], device=device)
+        self.classifier = Classifier(**config, device=device)
 
     def setup_human_count(self, config: Dict) -> None:
         """
