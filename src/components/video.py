@@ -90,7 +90,11 @@ class Video:
 
         # Recorder the video
         if hasattr(self, "recorder"):
-            self.recorder.write(cv2.resize(self.current_frame, self.recorder_res))
+            self.recorder.write(
+                cv2.resize(self.current_frame, self.recorder_res)
+                if self.recorder_res
+                else self.current_frame
+            )
 
         # Update progress
         if (self.progress.n + self.speed) > self.total_frame:
@@ -245,9 +249,7 @@ class Video:
 
         self.recorder_fps = int(fps) if fps else self.fps
 
-        self.recorder_res = (
-            tuple_handler(resolution, max_dim=2) if resolution else self.size()
-        )
+        self.recorder_res = tuple_handler(resolution, max_dim=2) if resolution else None
 
         # Config writer
         self.recorder = cv2.VideoWriter(

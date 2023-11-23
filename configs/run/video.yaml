@@ -12,7 +12,7 @@ video:
   delay: 1
 
   # Video resolution
-  resolution: [ 1280, 720 ]
+  resolution: null
 
 # Save output
 record:
@@ -26,4 +26,4 @@ record:
   fps: null
 
   # Output resolution
-  resolution: [ 1024, 576 ]
+  resolution: null
