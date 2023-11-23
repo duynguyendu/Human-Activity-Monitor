@@ -2,14 +2,25 @@
 
 
 classifier:
-  # Model weight path
-  checkpoint: weights/vit.pt
+  model:
+    # Model weight path
+    checkpoint: weights/vit.pt
 
-  # Size of image for the inference
-  image_size: 224
+    # Size of image for the inference
+    image_size: 224
 
-  # Use half-precision (float16) instead of float32 for inference
-  half: true
+    # Use half-precision (float16) instead of float32 for inference
+    half: true
 
-  # Use TorchDynamo, the latest method to speed up PyTorch code
-  optimize: true
+    # Use TorchDynamo, the latest method to speed up PyTorch code
+    optimize: true
+
+  show:
+    # Result label
+    text: true
+
+    # Classification confidence score
+    score: false
+
+    # Dynamic color based on score
+    dynamic_color: true

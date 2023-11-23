@@ -84,7 +84,8 @@ class Backbone:
         Returns:
             None
         """
-        self.classifier = Classifier(**config, device=device)
+        self.classifier = Classifier(**config["model"], device=device)
+        self.show_classified = config["show"]
 
     def setup_human_count(self, config: Dict) -> None:
         """
@@ -178,14 +179,20 @@ class Backbone:
         Returns:
             Union[np.ndarray, Mat]: The output frame.
         """
+
+        # Skip all of the process if detector is not specified
         if not hasattr(self, "detector"):
             return frame
 
-        outputs = self.detector(frame)
+        boxes = self.detector(frame)
 
+        # Lambda function for dynamic color apply
+        dynamic_color = lambda x: (0, x * 400, ((1 - x) * 400))
+
+        # Human count
         if hasattr(self, "human_count"):
             # Update new value
-            self.human_count.update(value=len(outputs))
+            self.human_count.update(value=len(boxes))
             # Add to frame
             self.video.add_text(
                 text=f"Person: {self.human_count.get_value()}",
@@ -193,31 +200,63 @@ class Backbone:
                 thickness=2,
             )
 
-        for output in outputs:
-            x1, y1, x2, y2 = output["box"]
+        for detect_output in boxes:
+            x1, y1, x2, y2 = detect_output["box"]
 
             center = ((x1 + x2) // 2, (y1 + y2) // 2)
 
             if self.show_detected:
+                color = (
+                    dynamic_color(detect_output["score"])
+                    if self.show_detected["dynamic_color"]
+                    else 255
+                )
+
                 if self.show_detected["dot"]:
-                    self.video.add_point(center=center, radius=5, color=(225, 225, 225))
+                    self.video.add_point(center=center, radius=5, color=color)
 
                 if self.show_detected["box"]:
                     self.video.add_box(
-                        top_left=(x1, y1), bottom_right=(x2, y2), color=255, thickness=2
+                        top_left=(x1, y1),
+                        bottom_right=(x2, y2),
+                        color=color,
+                        thickness=2,
                     )
 
                 if self.show_detected["score"]:
                     self.video.add_text(
-                        text=f"{output['conf']:.2}", pos=(x1, y2 - 5), thickness=2
+                        text=f"{detect_output['score']:.2}",
+                        pos=(x1, y2 - 5),
+                        color=color,
+                        thickness=2,
                     )
 
             if self.track:
-                self.video.add_text(text=output["id"], pos=(x1, y1 - 5), thickness=2)
+                self.video.add_text(
+                    text=detect_output["id"], pos=(x1, y1 - 5), thickness=2
+                )
 
-            if hasattr(self, "classifier"):
-                result = self.classifier(frame[y1:y2, x1:x2])
-                self.video.add_text(text=result, pos=(x1, y1 - 5), thickness=2)
+            # Classification
+            if hasattr(self, "classifier") and self.show_classified:
+                # Get model output
+                classify_output = self.classifier(frame[y1:y2, x1:x2])
+                # Format result
+                classify_result = ""
+                if self.show_classified["text"]:
+                    classify_result += classify_output["label"]
+                if self.show_classified["score"]:
+                    classify_result += f' ({classify_output["score"]:.2})'
+                # Add to frame, color based on score
+                self.video.add_text(
+                    text=classify_result,
+                    pos=(x1, y1 - 5),
+                    color=(
+                        dynamic_color(classify_output["score"])
+                        if self.show_classified["dynamic_color"]
+                        else 255
+                    ),
+                    thickness=2,
+                )
 
             if hasattr(self, "heatmap"):
                 self.heatmap.update(area=(x1, y1, x2, y2))

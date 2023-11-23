@@ -140,7 +140,7 @@ class Classifier:
             image (MatLike): Input image
 
         Returns:
-            str: Classified result
+            Dict: A dictionary contains classification result. Keys:`label` and `score`
         """
 
         # Transform
@@ -156,6 +156,8 @@ class Classifier:
 
             outputs = self.model(X)
 
-            _, pred = torch.max(outputs, 1)
+            outputs = torch.softmax(outputs, dim=1)
 
-        return self.CLASSES[pred.item()]
+            value, pos = torch.max(outputs, dim=1)
+
+        return {"label": self.CLASSES[pos.item()], "score": value.item()}

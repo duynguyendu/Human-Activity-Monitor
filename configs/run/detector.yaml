@@ -11,7 +11,7 @@ detector:
     track: false
 
     # Confidence threshold for detection
-    conf: 0.35
+    conf: 0.2
 
     # Intersection over Union
     iou: 0.4
@@ -38,6 +38,9 @@ detector:
   show:
     # Detection confidence score
     score: false
+
+    # Show dynamic color based on score
+    dynamic_color: true
 
     # Box surrounding
     box: true
