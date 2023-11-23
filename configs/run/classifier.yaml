@@ -2,15 +2,14 @@
 
 
 classifier:
-  model:
-    # Model weight path
-    checkpoint: weights/vit.pt
-
-    # Use half-precision (float16) instead of float32 for inference
-    half: true
-
-    # Use TorchDynamo, the latest method to speed up PyTorch code
-    optimize: true
+  # Model weight path
+  checkpoint: weights/vit.pt
 
   # Size of image for the inference
   image_size: 224
+
+  # Use half-precision (float16) instead of float32 for inference
+  half: true
+
+  # Use TorchDynamo, the latest method to speed up PyTorch code
+  optimize: true

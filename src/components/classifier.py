@@ -1,11 +1,12 @@
-from typing import Union
+from typing import Dict, Tuple, Union
 import os
 
 from torch.nn import Module
 from rich import print
 import torch
 
-from src.modules.utils import device_handler
+from src.modules.data.transform import DataTransformation
+from src.modules.utils import device_handler, tuple_handler
 
 
 class Classifier:
@@ -14,18 +15,20 @@ class Classifier:
     def __init__(
         self,
         checkpoint: str,
-        device: str = "auto",
+        image_size: Union[int, Tuple] = 224,
         half: bool = False,
         optimize: bool = False,
+        device: str = "auto",
     ):
         """
         Initialize the class.
 
         Args:
             - checkpoint (str): Path to the model checkpoint.
-            - device (str, optional): Device to use ("auto", "cuda", or "cpu"). Defaults to "auto".
+            - size (int or Tuple, optional): Input size for the model. Defaults to 224.
             - half (bool, optional): Use half-precision (float16). Defaults to False.
             - optimize (bool, optional): Use TorchDynamo for model optimization. Defaults to False.
+            - device (str, optional): Device to use ("auto", "cuda", or "cpu"). Defaults to "auto".
         """
         # Check if the provided checkpoint path exists
         if not os.path.exists(checkpoint):
@@ -35,7 +38,13 @@ class Classifier:
         # Determine the device based on user input or availability
         self.device = device_handler(device)
 
-        self.model = torch.load(self.ckpt)
+        # Defind transform
+        self.transform = DataTransformation.TOPIL(
+            image_size=tuple_handler(image_size, max_dim=2)
+        )
+
+        # Load model
+        self.model = torch.load(self.ckpt, map_location=self.device)
 
         # Apply half-precision if specified
         if half:
@@ -118,10 +127,12 @@ class Classifier:
             case 4:
                 pass
             case _:
-                raise ValueError(f"Input dimension must be 4. Got {X.dim()} instead.")
+                raise ValueError(
+                    f"Input dimension must be 3 (no batch) or 4 (with batch). Got {X.dim()} instead."
+                )
         return X
 
-    def forward(self, image: torch.Tensor) -> str:
+    def forward(self, image: torch.Tensor) -> Dict:
         """
         Forward pass of the model
 
@@ -131,12 +142,20 @@ class Classifier:
         Returns:
             str: Classified result
         """
-        with torch.inference_mode():
-            X = self.__check_dim(image).to(self.device)
 
+        # Transform
+        X = self.transform(image)
+
+        # Get result
+        with torch.inference_mode():
+            # Check dimension
+            X = self.__check_dim(X).to(self.device)
+
+            # Apply haft
             X = self.__half(X) if self.half else X
 
             outputs = self.model(X)
+
             _, pred = torch.max(outputs, 1)
 
         return self.CLASSES[pred.item()]
