@@ -8,7 +8,7 @@ from rootutils import autosetup
 
 autosetup()
 
-from components import Video, Backbone
+from components import Video
 
 
 @hydra.main(config_path="../configs/run", config_name="run", version_base="1.3")
@@ -17,7 +17,9 @@ def main(cfg: DictConfig) -> None:
     shutil.rmtree("outputs")
 
     # Load video
-    VIDEO = Video(**cfg["video"], backbone=Backbone(config=cfg))
+    VIDEO = Video(**cfg["video"])
+
+    VIDEO.setup_backbone(config=cfg)
 
     if cfg["record"]:
         VIDEO.record(**cfg["record"])
