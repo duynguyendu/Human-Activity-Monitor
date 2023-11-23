@@ -12,6 +12,7 @@ from . import *
 
 
 class Backbone:
+    # Available processes
     PROCESSES = {
         "detector": "Detection",
         "classifier": "Classification",
@@ -21,32 +22,80 @@ class Backbone:
     }
 
     def __init__(self, video: "Video", config: Dict) -> None:
+        """
+        Initialize the Backbone object.
+
+        Args:
+            video (Video): An object representing the video input.
+            config (Dict): Configuration settings for different processes.
+        """
         print("[bold]Summary:[/]")
         self.video = video
 
+        # Setup each process
         print("  [bold]Process status:[/]")
         for key, process in self.PROCESSES.items():
             if key in config and config[key]:
-                if key in ["detector", "classifier"]:
-                    getattr(self, f"setup_{key}")(config[key], device=config["device"])
-                else:
-                    getattr(self, f"setup_{key}")(config[key])
+                args = (
+                    [config[key]]
+                    if key not in ["detector", "classifier"]
+                    else [config[key], {"device": config["device"]}]
+                )
+                getattr(self, f"setup_{key}")(*args)
                 print(f"    {process}: [green]Enable[/]")
             else:
                 print(f"    {process}: [red]Disable[/]")
 
-    def __call__(self, frame: Union[np.ndarray, Mat]):
+    def __call__(self, frame: Union[np.ndarray, Mat]) -> Union[np.ndarray, Mat]:
+        """
+        Applies the configured processes to the input frame.
+
+        Args:
+            frame (Union[np.ndarray, Mat]): The input frame.
+
+        Returns:
+            Union[np.ndarray, Mat]: The output frame.
+        """
         return self.apply(frame)
 
     def setup_detector(self, config: Dict, device: str) -> None:
+        """
+        Sets up the detector module with the specified configuration.
+
+        Args:
+            config (Dict): Configuration settings for the detector.
+            device (str): The device on which the detector will run.
+
+        Returns:
+            None
+        """
         self.detector = Detector(**config["model"], device=device)
         self.show_detected = config["show"]
         self.track = config["model"]["track"]
 
     def setup_classifier(self, config: Dict, device: str) -> None:
+        """
+        Sets up the classifier module with the specified configuration.
+
+        Args:
+            config (Dict): Configuration settings for the classifier.
+            device (str): The device on which the classifier will run.
+
+        Returns:
+            None
+        """
         self.classifier = Classifier(**config["classifier"], device=device)
 
     def setup_human_count(self, config: Dict) -> None:
+        """
+        Sets up the human count module with the specified configuration.
+
+        Args:
+            config (Dict): Configuration settings for human count.
+
+        Returns:
+            None
+        """
         self.human_count = HumanCount(smoothness=config["smoothness"])
         if config["save"]:
             save_path = os.path.join(
@@ -63,6 +112,15 @@ class Backbone:
             print(f"  [bold]Save counted people to:[/] [green]{save_path}.csv[/]")
 
     def setup_heatmap(self, config: Dict) -> None:
+        """
+        Sets up the heatmap module with the specified configuration.
+
+        Args:
+            config (Dict): Configuration settings for the heatmap.
+
+        Returns:
+            None
+        """
         self.heatmap = Heatmap(shape=self.video.size(reverse=True), **config["layer"])
 
         if config["save"]:
@@ -98,10 +156,28 @@ class Backbone:
                 print(f"  [bold]Save heatmap image to:[/] [green]{save_path}.jpg[/]")
 
     def setup_track_box(self, config: Dict) -> None:
+        """
+        Sets up the track box module with the specified configuration.
+
+        Args:
+            config (Dict): Configuration settings for the track box.
+
+        Returns:
+            None
+        """
         self.track_box = TrackBox(**config["default"])
         [self.track_box.new(**box) for box in config["boxes"]]
 
-    def apply(self, frame: Union[np.ndarray, Mat]):
+    def apply(self, frame: Union[np.ndarray, Mat]) -> Union[np.ndarray, Mat]:
+        """
+        Applies the configured processes to the input frame.
+
+        Args:
+            frame (Union[np.ndarray, Mat]): The input frame.
+
+        Returns:
+            Union[np.ndarray, Mat]: The output frame.
+        """
         if not hasattr(self, "detector"):
             return frame
 
@@ -164,5 +240,11 @@ class Backbone:
         return frame
 
     def finish(self) -> None:
+        """
+        Call finish process. Releases resources associated.
+
+        Returns:
+            None
+        """
         if hasattr(self, "heatmap"):
             self.heatmap.release()
