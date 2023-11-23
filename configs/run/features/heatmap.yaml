@@ -2,17 +2,19 @@
 
 
 heatmap:
-  # Grow value
-  grow: 3
+  # Layer config
+  layer:
+    # Grow value
+    grow_value: 3
 
-  # Decay value
-  decay: 1
+    # Decay value
+    decay_value: 1
 
-  # Soften the layer
-  blur: 0.8
+    # Soften the layer
+    blurriness: 0.8
 
-  # Layer opacity
-  alpha: 0.5
+    # Layer opacity
+    alpha: 0.5
 
   # Save output
   save:
@@ -22,8 +24,10 @@ heatmap:
     # Write an average image
     image: true
 
-    # Save path and name
+    # Save path
     save_path: records/
+
+    # Save name
     save_name: heatmap
 
     # Output resolution
