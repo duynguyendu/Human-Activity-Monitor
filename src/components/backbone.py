@@ -39,7 +39,7 @@ class Backbone:
                 args = (
                     [config[key]]
                     if key not in ["detector", "classifier"]
-                    else [config[key], {"device": config["device"]}]
+                    else [config[key], config["device"]]
                 )
                 getattr(self, f"setup_{key}")(*args)
                 print(f"    {process}: [green]Enable[/]")
