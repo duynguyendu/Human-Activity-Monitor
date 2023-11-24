@@ -12,15 +12,6 @@ from . import *
 
 
 class Backbone:
-    # Available processes
-    PROCESSES = {
-        "detector": "Detection",
-        "classifier": "Classification",
-        "human_count": "Human count",
-        "heatmap": "Heatmap",
-        "track_box": "Track box",
-    }
-
     def __init__(self, video: "Video", config: Dict) -> None:
         """
         Initialize the Backbone object.
@@ -32,19 +23,27 @@ class Backbone:
         print("[bold]Summary:[/]")
         self.video = video
 
+        # Process status
+        self.status = {
+            process: False
+            for process in [
+                "detector",
+                "classifier",
+                "human_count",
+                "heatmap",
+                "track_box",
+            ]
+        }
+
         # Setup each process
-        print("  [bold]Process status:[/]")
-        for key, process in self.PROCESSES.items():
-            if key in config and config[key]:
+        for process in self.status:
+            if config.get(process, False) or config["features"].get(process, False):
                 args = (
-                    [config[key]]
-                    if key not in ["detector", "classifier"]
-                    else [config[key], config["device"]]
+                    [config["features"][process]]
+                    if process not in ["detector", "classifier"]
+                    else [config[process], config["device"]]
                 )
-                getattr(self, f"setup_{key}")(*args)
-                print(f"    {process}: [green]Enable[/]")
-            else:
-                print(f"    {process}: [red]Disable[/]")
+                getattr(self, f"setup_{process}")(*args)
 
     def __call__(self, frame: Union[np.ndarray, Mat]) -> Union[np.ndarray, Mat]:
         """
@@ -181,9 +180,10 @@ class Backbone:
         """
 
         # Skip all of the process if detector is not specified
-        if not hasattr(self, "detector"):
+        if not (hasattr(self, "detector") and self.status["detector"]):
             return frame
 
+        # Get detector output
         boxes = self.detector(frame)
 
         # Lambda function for dynamic color apply
@@ -200,21 +200,28 @@ class Backbone:
                 thickness=2,
             )
 
+        # Loop through the boxes
         for detect_output in boxes:
+            # xyxy location
             x1, y1, x2, y2 = detect_output["box"]
 
+            # Center point
             center = ((x1 + x2) // 2, (y1 + y2) // 2)
 
+            # Check detector show options
             if self.show_detected:
+                # Apply dynamic color
                 color = (
                     dynamic_color(detect_output["score"])
                     if self.show_detected["dynamic_color"]
                     else 255
                 )
 
+                # Show dot
                 if self.show_detected["dot"]:
                     self.video.add_point(center=center, radius=5, color=color)
 
+                # Show box
                 if self.show_detected["box"]:
                     self.video.add_box(
                         top_left=(x1, y1),
@@ -223,6 +230,7 @@ class Backbone:
                         thickness=2,
                     )
 
+                # Show score
                 if self.show_detected["score"]:
                     self.video.add_text(
                         text=f"{detect_output['score']:.2}",
@@ -231,15 +239,25 @@ class Backbone:
                         thickness=2,
                     )
 
+            # Show id it track
             if self.track:
                 self.video.add_text(
                     text=detect_output["id"], pos=(x1, y1 - 5), thickness=2
                 )
 
             # Classification
-            if hasattr(self, "classifier") and self.show_classified:
+            if (
+                hasattr(self, "classifier")
+                and self.show_classified
+                and self.status["classifier"]
+            ):
+                # Add box margin
+                box_margin = 10
+                human_box = frame[
+                    y1 - box_margin : y2 + box_margin, x1 - box_margin : x2 + box_margin
+                ]
                 # Get model output
-                classify_output = self.classifier(frame[y1:y2, x1:x2])
+                classify_output = self.classifier(human_box)
                 # Format result
                 classify_result = ""
                 if self.show_classified["text"]:
@@ -258,18 +276,21 @@ class Backbone:
                     thickness=2,
                 )
 
-            if hasattr(self, "heatmap"):
+            # Update heatmap
+            if hasattr(self, "heatmap") and self.status["heatmap"]:
                 self.heatmap.update(area=(x1, y1, x2, y2))
 
-            if hasattr(self, "track_box"):
+            # Check for track box
+            if hasattr(self, "track_box") and self.status["track_box"]:
                 self.track_box.check(pos=center)
 
-        if hasattr(self, "heatmap"):
+        # Apply heatmap
+        if hasattr(self, "heatmap") and self.status["heatmap"]:
             self.heatmap.decay()
-
             frame, heat_layer = self.heatmap.apply(image=frame)
 
-        if hasattr(self, "track_box"):
+        # Add track box to frame
+        if hasattr(self, "track_box") and self.status["track_box"]:
             for data in self.track_box.BOXES:
                 self.video.add_box(**data["box"].box_config)
                 self.video.add_text(

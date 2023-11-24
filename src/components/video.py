@@ -165,6 +165,18 @@ class Video:
         """
         return int(self.cap.get(cv2.CAP_PROP_FPS))
 
+    @cached_property
+    def shortcuts(self) -> Dict:
+        return {
+            "quit": "q",
+            "pause": "p",
+            "resume": "r",
+            "detector": "1",
+            "classifier": "2",
+            "heatmap": "3",
+            "track_box": "4",
+        }
+
     def setup_backbone(self, config: Dict) -> None:
         """
         Initializes and sets up backbone for video process.
@@ -189,7 +201,7 @@ class Video:
             total=self.total_frame,
             desc=f"  {self.name}",
             unit=" frame",
-            smoothing=0.01,
+            smoothing=0.3,
             delay=0.1,
             colour="cyan",
         )
@@ -398,8 +410,17 @@ class Video:
 
         # Check pause status
         self.pause = (
-            True if key == ord("p") else False if key == ord("r") else self.pause
+            True
+            if key == ord(self.shortcuts["pause"])
+            else False
+            if key == ord(self.shortcuts["resume"])
+            else self.pause
         )
+
+        # Check features toggle
+        for process in self.backbone.status:
+            if process != "human_count" and key == ord(self.shortcuts[process]):
+                self.backbone.status[process] = not self.backbone.status[process]
 
         # Check continue
         return True if not key == ord("q") else False
