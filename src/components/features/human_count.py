@@ -1,3 +1,4 @@
+from collections import deque
 from pathlib import Path
 import numpy as np
 
@@ -11,8 +12,7 @@ class HumanCount:
             smoothness (int): The number of recent values to consider for smoothing.
                 A higher value results in a smoother, but potentially slower, response.
         """
-        self.smoothness = smoothness
-        self.history = list()
+        self.history = deque([], maxlen=max(1, smoothness))
 
     def get_value(self) -> int:
         """
@@ -34,8 +34,6 @@ class HumanCount:
             None
         """
         self.history.append(value)
-        if len(self.history) > self.smoothness:
-            self.history.pop(0)
 
         if hasattr(self, "save_conf"):
             current = (

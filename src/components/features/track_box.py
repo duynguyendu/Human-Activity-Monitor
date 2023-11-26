@@ -1,6 +1,7 @@
 from typing import Tuple, Union
+from collections import deque
 
-import cupy as cp
+import numpy as np
 
 from src.modules.utils import tuple_handler
 
@@ -31,8 +32,7 @@ class Box:
             text_thickness (int): Thickness of the text.
         """
         self.xyxy = (*top_left, *bottom_right)
-        self.smoothness = smoothness
-        self.history = list()
+        self.history = deque([], maxlen=smoothness)
         self.count = 0
         self.box_config = {
             "top_left": top_left,
@@ -69,10 +69,8 @@ class Box:
             int: Smoothed count value.
         """
         self.history.append(self.count)
-        if len(self.history) > self.smoothness:
-            self.history.pop(0)
         self.count = 0
-        return int(cp.mean(cp.array(self.history)))
+        return int(np.mean(self.history))
 
 
 class TrackBox:
