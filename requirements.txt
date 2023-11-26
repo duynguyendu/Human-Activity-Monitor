@@ -1,6 +1,5 @@
 # essensial
 numpy>=1.26.0
-cupy-cuda12x>=12.0.0
 
 # torch
 torch>=2.0.0
