@@ -5,6 +5,9 @@ human_count:
   # Increasing the value makes the output more stable but the response is slower
   smoothness: 10
 
+  # Text position
+  position: [20, 40]
+
   # Save output
   save:
     # Save path and name
