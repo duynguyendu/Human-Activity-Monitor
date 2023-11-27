@@ -2,6 +2,7 @@ from functools import cached_property
 from typing import Dict, Tuple, Union
 from pathlib import Path
 import itertools
+import time
 import os
 
 from rich import print
@@ -19,6 +20,8 @@ class Video:
         path: str,
         speed: int = 1,
         delay: int = 1,
+        subsampling: int = 1,
+        sync: bool = False,
         resolution: Tuple = None,
         progress_bar: bool = True,
     ) -> None:
@@ -29,7 +32,9 @@ class Video:
             path (str): Path of the video to open.
             speed (int, optional): Playback speed of the video. Defaults to 1.
             delay (int, optional): Delay between frames in milliseconds. Defaults to 1.
-            resolution (Tuple, optional): Change resolution of the video.
+            subsampling (int, optional): Skip frames during processing. Defaults to 1.
+            sync (bool, optional): Synchronize video playback and frame processing. Defaults to False.
+            resolution (Tuple, optional): Change resolution of the video. Defaults to None.
             progress_bar (bool, optional): Display progress bar during video playback. Defaults to True.
 
         Raises:
@@ -41,11 +46,40 @@ class Video:
             )
         self.video_capture = cv2.VideoCapture(path)
         self.path = path
-        self.speed = speed
+        if isinstance(speed, float):
+            self.speed = int(max(1, speed))
+            self.speed_mul = speed / self.speed
+        else:
+            self.speed = max(1, speed)
         self.wait = delay
+        self.subsampling = max(1, subsampling)
+        self.sync = sync
         self.resolution = tuple_handler(resolution, max_dim=2) if resolution else None
         self.progress_bar = progress_bar
-        self.pause = False
+
+    def __resync(func):
+        """Synchronize video speed with fps"""
+
+        def wrapper(self):
+            if not hasattr(self, "start_time"):
+                self.start_time = time.time()
+
+            out = func(self)
+
+            delay = time.time() - self.start_time
+
+            sync_time = (
+                1 / self.fps / (self.speed_mul if hasattr(self, "speed_mul") else 1)
+            )
+
+            if delay < sync_time:
+                time.sleep(sync_time - delay)
+
+            self.start_time = time.time()
+
+            return out
+
+        return wrapper
 
     def __iter__(self) -> "Video":
         """
@@ -61,16 +95,17 @@ class Video:
                 yield frame
 
         # Generate frame queue
-        self.queue = itertools.islice(generate(), 0, None, max(1, self.speed))
+        self.queue = itertools.islice(generate(), 0, None, self.speed)
+
+        self.pause = False
 
         self.setup_progress_bar(show=self.progress_bar)
 
         print(f"[bold]Video progress:[/]")
 
-        self.current_frame = None
-
         return self
 
+    @__resync
     def __next__(self) -> Union[cv2.Mat, np.ndarray]:
         """
         Get the next frame from the video.
@@ -78,6 +113,8 @@ class Video:
         Returns:
             MatLike: The next frame.
         """
+
+        # Get current frame
         self.current_frame = next(self.queue)
 
         # Change video resolution
@@ -85,8 +122,17 @@ class Video:
             self.current_frame = cv2.resize(self.current_frame, self.resolution)
 
         # Backbone process
-        if self.backbone:
-            self.current_frame = self.backbone.apply(self.current_frame)
+        if hasattr(self, "backbone"):
+            # Check subsampling
+            if (self.progress.n % self.subsampling) == 0:
+                # Create a processed overlay
+                self.overlay = self.backbone.apply(self.current_frame)
+
+                # Create a processed mask
+                self.mask = cv2.cvtColor(self.overlay, cv2.COLOR_BGR2GRAY) != 0
+
+            # Apply mask to current frame
+            self.current_frame[self.mask] = self.overlay[self.mask]
 
         # Recorder the video
         if hasattr(self, "recorder"):
@@ -102,6 +148,10 @@ class Video:
             self.progress.update(self.total_frame - self.progress.n)
         else:
             self.progress.update(self.speed)
+
+        # Sync frame speed
+        if self.sync:
+            self.__resync()
 
         # Return current frame
         return self.current_frame
@@ -167,6 +217,12 @@ class Video:
 
     @cached_property
     def shortcuts(self) -> Dict:
+        """
+        Return shortcut of the video
+
+        Returns:
+            Dict: Shortcut of the video
+        """
         return {
             "quit": "q",
             "pause": "p",
@@ -214,6 +270,17 @@ class Video:
             tqdm: An instance of the tqdm class representing a custom progress bar.
         """
         self.progress = tqdm
+
+    def custom_shortcut(self, values: Dict):
+        """
+        Updates the existing shortcuts dictionary with the provided new_shortcuts.
+
+        Args:
+            new_shortcuts (Dict): Dictionary containing shortcut name-key pairs.
+        """
+        self.shortcuts.update(
+            {name: key for name, key in values.items() if name in self.shortcuts}
+        )
 
     def size(self, reverse: bool = False) -> Tuple[int, int]:
         """
@@ -384,6 +451,10 @@ class Video:
 
     def show(self) -> None:
         """Show the frame"""
+        if not hasattr(self, "current_frame"):
+            raise ValueError(
+                "No current frame to show. Please run or loop through the video first."
+            )
         cv2.imshow(self.stem, self.current_frame)
 
     def run(self) -> None:
@@ -418,9 +489,10 @@ class Video:
         )
 
         # Check features toggle
-        for process in self.backbone.status:
-            if process != "human_count" and key == ord(self.shortcuts[process]):
-                self.backbone.status[process] = not self.backbone.status[process]
+        if hasattr(self, "backbone"):
+            for process in self.backbone.status:
+                if process != "human_count" and key == ord(self.shortcuts[process]):
+                    self.backbone.status[process] = not self.backbone.status[process]
 
         # Check continue
         return True if not key == ord("q") else False

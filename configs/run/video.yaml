@@ -11,8 +11,17 @@ video:
   # Frame delay (millisecond)
   delay: 1
 
+  # Process 1 every n frame
+  subsampling: 10
+
+  # Wait for processed frame
+  sync: true
+
   # Video resolution
   resolution: null
+
+  # Display video progress
+  progress_bar: true
 
 # Save output
 record:

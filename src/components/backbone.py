@@ -1,9 +1,12 @@
+from functools import cached_property
 from typing import Dict, Union
+from copy import deepcopy
 import os
 
 from rich import print
 from cv2 import Mat
 import numpy as np
+import cv2
 
 from src.modules.utils import tuple_handler
 
@@ -57,6 +60,16 @@ class Backbone:
         """
         return self.apply(frame)
 
+    @cached_property
+    def new_mask(self) -> np.ndarray:
+        """
+        Return new video mask
+
+        Returns:
+            np.ndarray: new mask
+        """
+        return np.zeros((*self.video.size(reverse=True), 3), dtype=np.uint8)
+
     def setup_detector(self, config: Dict, device: str) -> None:
         """
         Sets up the detector module with the specified configuration.
@@ -97,6 +110,8 @@ class Backbone:
             None
         """
         self.human_count = HumanCount(smoothness=config["smoothness"])
+        self.human_count_position = config["position"]
+
         if config["save"]:
             save_path = os.path.join(
                 config["save"]["save_path"],
@@ -122,6 +137,7 @@ class Backbone:
             None
         """
         self.heatmap = Heatmap(shape=self.video.size(reverse=True), **config["layer"])
+        self.heatmap_opacity = config["opacity"]
 
         if config["save"]:
             # Config save path
@@ -179,9 +195,12 @@ class Backbone:
             Union[np.ndarray, Mat]: The output frame.
         """
 
+        # Create an empty mask
+        self.mask = deepcopy(self.new_mask)
+
         # Skip all of the process if detector is not specified
         if not (hasattr(self, "detector") and self.status["detector"]):
-            return frame
+            return self.mask
 
         # Get detector output
         boxes = self.detector(frame)
@@ -194,9 +213,13 @@ class Backbone:
             # Update new value
             self.human_count.update(value=len(boxes))
             # Add to frame
-            self.video.add_text(
+            cv2.putText(
+                img=self.mask,
                 text=f"Person: {self.human_count.get_value()}",
-                pos=(20, 40),
+                org=self.human_count_position,
+                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                fontScale=1,
+                color=tuple_handler(255, max_dim=3),
                 thickness=2,
             )
 
@@ -219,30 +242,46 @@ class Backbone:
 
                 # Show dot
                 if self.show_detected["dot"]:
-                    self.video.add_point(center=center, radius=5, color=color)
+                    cv2.circle(
+                        img=self.mask,
+                        center=center,
+                        radius=5,
+                        color=color,
+                        thickness=-1,
+                    )
 
                 # Show box
                 if self.show_detected["box"]:
-                    self.video.add_box(
-                        top_left=(x1, y1),
-                        bottom_right=(x2, y2),
+                    cv2.rectangle(
+                        img=self.mask,
+                        pt1=(x1, y1),
+                        pt2=(x2, y2),
                         color=color,
                         thickness=2,
                     )
 
                 # Show score
                 if self.show_detected["score"]:
-                    self.video.add_text(
+                    cv2.putText(
+                        img=self.mask,
                         text=f"{detect_output['score']:.2}",
-                        pos=(x1, y2 - 5),
+                        org=(x1, y2 - 5),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=1,
                         color=color,
                         thickness=2,
                     )
 
             # Show id it track
             if self.track:
-                self.video.add_text(
-                    text=detect_output["id"], pos=(x1, y1 - 5), thickness=2
+                cv2.putText(
+                    img=self.mask,
+                    text=detect_output["id"],
+                    org=(x1, y1 - 5),
+                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                    fontScale=1,
+                    color=tuple_handler(255, max_dim=2),
+                    thickness=2,
                 )
 
             # Classification
@@ -256,18 +295,25 @@ class Backbone:
                 human_box = frame[
                     y1 - box_margin : y2 + box_margin, x1 - box_margin : x2 + box_margin
                 ]
+
                 # Get model output
                 classify_output = self.classifier(human_box)
+
                 # Format result
                 classify_result = ""
                 if self.show_classified["text"]:
                     classify_result += classify_output["label"]
+
                 if self.show_classified["score"]:
                     classify_result += f' ({classify_output["score"]:.2})'
+
                 # Add to frame, color based on score
-                self.video.add_text(
+                cv2.putText(
+                    img=self.mask,
                     text=classify_result,
-                    pos=(x1, y1 - 5),
+                    org=(x1, y1 - 5),
+                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                    fontScale=1,
                     color=(
                         dynamic_color(classify_output["score"])
                         if self.show_classified["dynamic_color"]
@@ -287,17 +333,21 @@ class Backbone:
         # Apply heatmap
         if hasattr(self, "heatmap") and self.status["heatmap"]:
             self.heatmap.decay()
-            frame, heat_layer = self.heatmap.apply(image=frame)
+            self.video.add_image(image=self.heatmap.get(), opacity=self.heatmap_opacity)
 
         # Add track box to frame
         if hasattr(self, "track_box") and self.status["track_box"]:
             for data in self.track_box.BOXES:
-                self.video.add_box(**data["box"].box_config)
-                self.video.add_text(
-                    text=data["box"].get_value(), **data["box"].text_config
+                cv2.rectangle(self.mask, *data["box"].box_config.values())
+                cv2.putText(
+                    self.mask,
+                    str(data["box"].get_value()),
+                    list(data["box"].text_config.values())[0],
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    *list(data["box"].text_config.values())[1:],
                 )
 
-        return frame
+        return self.mask
 
     def finish(self) -> None:
         """
