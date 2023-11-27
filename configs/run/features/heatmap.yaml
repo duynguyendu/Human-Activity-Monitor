@@ -13,8 +13,8 @@ heatmap:
     # Soften the layer
     blurriness: 0.8
 
-    # Layer opacity
-    alpha: 0.5
+  # Layer opacity
+  opacity: 0.5
 
   # Save output
   save:
