@@ -1,6 +1,8 @@
 from functools import cached_property
 from typing import Dict, Tuple, Union
 from pathlib import Path
+from queue import Queue
+import threading
 import itertools
 import time
 import os
@@ -44,40 +46,56 @@ class Video:
             raise FileExistsError(
                 "File not found. Check again or use an absolute path."
             )
-        self.video_capture = cv2.VideoCapture(path)
         self.path = path
-        if isinstance(speed, float):
-            self.speed = int(max(1, speed))
-            self.speed_mul = speed / self.speed
-        else:
-            self.speed = max(1, speed)
-        self.wait = delay
+        self.video_capture = cv2.VideoCapture(path)
+        self.__check_speed(speed)
+        self.wait = int(delay)
         self.subsampling = max(1, subsampling)
-        self.sync = sync
+        self.sync = bool(sync)
         self.resolution = tuple_handler(resolution, max_dim=2) if resolution else None
-        self.progress_bar = progress_bar
+        self.progress_bar = bool(progress_bar)
+
+    def __check_speed(self, value: Union[int, float]) -> None:
+        """
+        Check and setup speed parameter.
+
+        Args:
+            value (Union[int, float]): Speed value to check.
+        """
+        self.speed = int(max(1, value))
+        if isinstance(value, float):
+            self.speed_mul = value / self.speed
 
     def __resync(func):
         """Synchronize video speed with fps"""
 
+        # Create wrapper function
         def wrapper(self):
+            # Check if sync is disable
+            if not self.sync:
+                return func(self)
+
+            # Check on first run
             if not hasattr(self, "start_time"):
                 self.start_time = time.time()
 
-            out = func(self)
+            # Run the function
+            output = func(self)
 
+            # Get delay time
             delay = time.time() - self.start_time
-
+            # Calculate sync value
             sync_time = (
                 1 / self.fps / (self.speed_mul if hasattr(self, "speed_mul") else 1)
             )
-
+            # Apply sync if needed
             if delay < sync_time:
                 time.sleep(sync_time - delay)
-
+            # Setup for new circle
             self.start_time = time.time()
 
-            return out
+            # Return function output
+            return output
 
         return wrapper
 
@@ -97,8 +115,13 @@ class Video:
         # Generate frame queue
         self.queue = itertools.islice(generate(), 0, None, self.speed)
 
+        # Initialize
         self.pause = False
 
+        # Safe thread to store backbone output
+        self.backbone_result = Queue()
+
+        # Setup progress bar
         self.setup_progress_bar(show=self.progress_bar)
 
         print(f"[bold]Video progress:[/]")
@@ -125,14 +148,29 @@ class Video:
         if hasattr(self, "backbone"):
             # Check subsampling
             if (self.progress.n % self.subsampling) == 0:
-                # Create a processed overlay
-                self.overlay = self.backbone.apply(self.current_frame)
+                # Create a new thread if the backbone process does not exist or is not running
+                if (
+                    not hasattr(self, "backbone_process")
+                    or not self.backbone_process.is_alive()
+                ):
+                    # Spam a new thread
+                    self.backbone_process = threading.Thread(
+                        target=self.backbone.apply,
+                        args=(self.current_frame, self.backbone_result),
+                        daemon=True,
+                    )
 
-                # Create a processed mask
-                self.mask = cv2.cvtColor(self.overlay, cv2.COLOR_BGR2GRAY) != 0
+                    # Start running the thread
+                    self.backbone_process.start()
+
+                # Retrieve a new overlay and mask if any threads have completed
+                if not self.backbone_result.empty():
+                    self.overlay = self.backbone_result.get()
+                    self.mask = cv2.cvtColor(self.overlay, cv2.COLOR_BGR2GRAY) != 0
 
             # Apply mask to current frame
-            self.current_frame[self.mask] = self.overlay[self.mask]
+            if hasattr(self, "overlay"):
+                self.current_frame[self.mask] = self.overlay[self.mask]
 
         # Recorder the video
         if hasattr(self, "recorder"):
@@ -143,11 +181,7 @@ class Video:
             )
 
         # Update progress
-        if (self.progress.n + self.speed) > self.total_frame:
-            # Handle progress overflow
-            self.progress.update(self.total_frame - self.progress.n)
-        else:
-            self.progress.update(self.speed)
+        self.progress.update(min(self.speed, self.total_frame - self.progress.n))
 
         # Sync frame speed
         if self.sync:

@@ -1,6 +1,7 @@
 from functools import cached_property
 from typing import Dict, Union
 from copy import deepcopy
+from queue import Queue
 import os
 
 from rich import print
@@ -184,12 +185,15 @@ class Backbone:
         self.track_box = TrackBox(**config["default"])
         [self.track_box.new(**box) for box in config["boxes"]]
 
-    def apply(self, frame: Union[np.ndarray, Mat]) -> Union[np.ndarray, Mat]:
+    def apply(
+        self, frame: Union[np.ndarray, Mat], thread_queue: Queue = None
+    ) -> Union[np.ndarray, Mat]:
         """
         Applies the configured processes to the input frame.
 
         Args:
             frame (Union[np.ndarray, Mat]): The input frame.
+            thread_queue (Queue): Safe thread queue to store result. Default to None.
 
         Returns:
             Union[np.ndarray, Mat]: The output frame.
@@ -200,6 +204,8 @@ class Backbone:
 
         # Skip all of the process if detector is not specified
         if not (hasattr(self, "detector") and self.status["detector"]):
+            if thread_queue:
+                thread_queue.put(self.mask)
             return self.mask
 
         # Get detector output
@@ -347,6 +353,8 @@ class Backbone:
                     *list(data["box"].text_config.values())[1:],
                 )
 
+        if thread_queue:
+            thread_queue.put(self.mask)
         return self.mask
 
     def finish(self) -> None:
