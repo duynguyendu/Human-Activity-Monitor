@@ -47,9 +47,11 @@ class HumanCount:
 
             self.save_conf["count"] += 1
 
-    def save(self, save_path: str, interval: int, fps: int, speed: int = 1) -> None:
+    def config_save(
+        self, save_path: str, interval: int, fps: int, speed: int = 1
+    ) -> None:
         """
-        Save counter output
+        Save the counted value
 
         Args:
             save_path (str): Path to save output
