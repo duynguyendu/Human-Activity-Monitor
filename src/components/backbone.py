@@ -2,6 +2,7 @@ from functools import cached_property
 from typing import Dict, Union
 from copy import deepcopy
 from queue import Queue
+import threading
 import os
 
 from rich import print
@@ -16,16 +17,26 @@ from . import *
 
 
 class Backbone:
-    def __init__(self, video: "Video", config: Dict) -> None:
+    def __init__(
+        self,
+        video: "Video",
+        mask: bool = False,
+        thread: bool = False,
+        config: Dict = None,
+    ) -> None:
         """
         Initialize the Backbone object.
 
         Args:
             video (Video): An object representing the video input.
+            mask (bool): Apply the result to a mask instead. Default to False.
+            thread (bool): Run process on a separate thread. Default to False.
             config (Dict): Configuration settings for different processes.
         """
-        print("[bold]Summary:[/]")
         self.video = video
+        self.mask = mask
+        self.thread = thread
+        self.queue = Queue()
 
         # Process status
         self.status = {
@@ -38,6 +49,8 @@ class Backbone:
                 "track_box",
             ]
         }
+
+        print("[bold]Summary:[/]")
 
         # Setup each process
         for process in self.status:
@@ -59,7 +72,7 @@ class Backbone:
         Returns:
             Union[np.ndarray, Mat]: The output frame.
         """
-        return self.apply(frame)
+        return self.process(frame)
 
     @cached_property
     def new_mask(self) -> np.ndarray:
@@ -185,177 +198,228 @@ class Backbone:
         self.track_box = TrackBox(**config["default"])
         [self.track_box.new(**box) for box in config["boxes"]]
 
-    def apply(
-        self, frame: Union[np.ndarray, Mat], thread_queue: Queue = None
-    ) -> Union[np.ndarray, Mat]:
+    def threaded_process(func):
+        """Move process to a separate thread"""
+
+        def wrapper(self, frame):
+            # Check if using Thread
+            if not self.thread:
+                return func(self, frame)
+
+            # Turn mask on when using Thread
+            elif not self.mask:
+                self.mask = True
+
+            # Only spawn Thread on first run or Thread is free
+            if (
+                not hasattr(self, "current_process")
+                or not self.current_process.is_alive()
+            ):
+                # Spam a new thread
+                self.current_process = threading.Thread(
+                    target=func, args=(self, frame), daemon=True
+                )
+
+                # Start running the thread
+                self.current_process.start()
+
+        return wrapper
+
+    @threaded_process
+    def process(self, frame: Union[np.ndarray, Mat]) -> None:
         """
-        Applies the configured processes to the input frame.
+        Process the input frame.
 
         Args:
             frame (Union[np.ndarray, Mat]): The input frame.
-            thread_queue (Queue): Safe thread queue to store result. Default to None.
 
         Returns:
-            Union[np.ndarray, Mat]: The output frame.
+            None: Result is stored in a safe thread.
         """
 
-        # Create an empty mask
-        self.mask = deepcopy(self.new_mask)
+        # Check mask option
+        mask = deepcopy(self.new_mask if self.mask else frame)
 
         # Skip all of the process if detector is not specified
-        if not (hasattr(self, "detector") and self.status["detector"]):
-            if thread_queue:
-                thread_queue.put(self.mask)
-            return self.mask
+        if hasattr(self, "detector") and self.status["detector"]:
+            # Get detector output
+            boxes = self.detector(frame)
 
-        # Get detector output
-        boxes = self.detector(frame)
+            # Lambda function for dynamic color apply
+            dynamic_color = lambda x: (0, x * 400, ((1 - x) * 400))
 
-        # Lambda function for dynamic color apply
-        dynamic_color = lambda x: (0, x * 400, ((1 - x) * 400))
-
-        # Human count
-        if hasattr(self, "human_count"):
-            # Update new value
-            self.human_count.update(value=len(boxes))
-            # Add to frame
-            cv2.putText(
-                img=self.mask,
-                text=f"Person: {self.human_count.get_value()}",
-                org=self.human_count_position,
-                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                fontScale=1,
-                color=tuple_handler(255, max_dim=3),
-                thickness=2,
-            )
-
-        # Loop through the boxes
-        for detect_output in boxes:
-            # xyxy location
-            x1, y1, x2, y2 = detect_output["box"]
-
-            # Center point
-            center = ((x1 + x2) // 2, (y1 + y2) // 2)
-
-            # Check detector show options
-            if self.show_detected:
-                # Apply dynamic color
-                color = (
-                    dynamic_color(detect_output["score"])
-                    if self.show_detected["dynamic_color"]
-                    else 255
+            # Human count
+            if hasattr(self, "human_count"):
+                # Update new value
+                self.human_count.update(value=len(boxes))
+                # Add to frame
+                cv2.putText(
+                    img=mask,
+                    text=f"Person: {self.human_count.get_value()}",
+                    org=self.human_count_position,
+                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                    fontScale=1,
+                    color=tuple_handler(255, max_dim=3),
+                    thickness=2,
                 )
 
-                # Show dot
-                if self.show_detected["dot"]:
-                    cv2.circle(
-                        img=self.mask,
-                        center=center,
-                        radius=5,
-                        color=color,
-                        thickness=-1,
+            # Loop through the boxes
+            for detect_output in boxes:
+                # xyxy location
+                x1, y1, x2, y2 = detect_output["box"]
+
+                # Center point
+                center = ((x1 + x2) // 2, (y1 + y2) // 2)
+
+                # Check detector show options
+                if self.show_detected:
+                    # Apply dynamic color
+                    color = (
+                        dynamic_color(detect_output["score"])
+                        if self.show_detected["dynamic_color"]
+                        else 255
                     )
 
-                # Show box
-                if self.show_detected["box"]:
-                    cv2.rectangle(
-                        img=self.mask,
-                        pt1=(x1, y1),
-                        pt2=(x2, y2),
-                        color=color,
-                        thickness=2,
-                    )
+                    # Show dot
+                    if self.show_detected["dot"]:
+                        cv2.circle(
+                            img=mask,
+                            center=center,
+                            radius=5,
+                            color=color,
+                            thickness=-1,
+                        )
 
-                # Show score
-                if self.show_detected["score"]:
+                    # Show box
+                    if self.show_detected["box"]:
+                        cv2.rectangle(
+                            img=mask,
+                            pt1=(x1, y1),
+                            pt2=(x2, y2),
+                            color=color,
+                            thickness=2,
+                        )
+
+                    # Show score
+                    if self.show_detected["score"]:
+                        cv2.putText(
+                            img=mask,
+                            text=f"{detect_output['score']:.2}",
+                            org=(x1, y2 - 5),
+                            fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                            fontScale=1,
+                            color=color,
+                            thickness=2,
+                        )
+
+                # Show id it track
+                if self.track:
                     cv2.putText(
-                        img=self.mask,
-                        text=f"{detect_output['score']:.2}",
-                        org=(x1, y2 - 5),
+                        img=mask,
+                        text=detect_output["id"],
+                        org=(x1, y1 - 5),
                         fontFace=cv2.FONT_HERSHEY_SIMPLEX,
                         fontScale=1,
-                        color=color,
+                        color=tuple_handler(255, max_dim=2),
                         thickness=2,
                     )
 
-            # Show id it track
-            if self.track:
-                cv2.putText(
-                    img=self.mask,
-                    text=detect_output["id"],
-                    org=(x1, y1 - 5),
-                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                    fontScale=1,
-                    color=tuple_handler(255, max_dim=2),
-                    thickness=2,
-                )
+                # Classification
+                if (
+                    hasattr(self, "classifier")
+                    and self.show_classified
+                    and self.status["classifier"]
+                ):
+                    # Add box margin
+                    box_margin = 10
+                    human_box = frame[
+                        y1 - box_margin : y2 + box_margin,
+                        x1 - box_margin : x2 + box_margin,
+                    ]
 
-            # Classification
-            if (
-                hasattr(self, "classifier")
-                and self.show_classified
-                and self.status["classifier"]
-            ):
-                # Add box margin
-                box_margin = 10
-                human_box = frame[
-                    y1 - box_margin : y2 + box_margin, x1 - box_margin : x2 + box_margin
-                ]
+                    # Get model output
+                    classify_output = self.classifier(human_box)
 
-                # Get model output
-                classify_output = self.classifier(human_box)
+                    # Format result
+                    classify_result = ""
+                    if self.show_classified["text"]:
+                        classify_result += classify_output["label"]
 
-                # Format result
-                classify_result = ""
-                if self.show_classified["text"]:
-                    classify_result += classify_output["label"]
+                    if self.show_classified["score"]:
+                        classify_result += f' ({classify_output["score"]:.2})'
 
-                if self.show_classified["score"]:
-                    classify_result += f' ({classify_output["score"]:.2})'
+                    # Add to frame, color based on score
+                    cv2.putText(
+                        img=mask,
+                        text=classify_result,
+                        org=(x1, y1 - 5),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=1,
+                        color=(
+                            dynamic_color(classify_output["score"])
+                            if self.show_classified["dynamic_color"]
+                            else 255
+                        ),
+                        thickness=2,
+                    )
 
-                # Add to frame, color based on score
-                cv2.putText(
-                    img=self.mask,
-                    text=classify_result,
-                    org=(x1, y1 - 5),
-                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                    fontScale=1,
-                    color=(
-                        dynamic_color(classify_output["score"])
-                        if self.show_classified["dynamic_color"]
-                        else 255
-                    ),
-                    thickness=2,
-                )
+                # Update heatmap
+                if hasattr(self, "heatmap") and self.status["heatmap"]:
+                    self.heatmap.update(area=(x1, y1, x2, y2))
 
-            # Update heatmap
+                # Check for track box
+                if hasattr(self, "track_box") and self.status["track_box"]:
+                    self.track_box.check(pos=center)
+
+            # Apply heatmap
             if hasattr(self, "heatmap") and self.status["heatmap"]:
-                self.heatmap.update(area=(x1, y1, x2, y2))
-
-            # Check for track box
-            if hasattr(self, "track_box") and self.status["track_box"]:
-                self.track_box.check(pos=center)
-
-        # Apply heatmap
-        if hasattr(self, "heatmap") and self.status["heatmap"]:
-            self.heatmap.decay()
-            self.video.add_image(image=self.heatmap.get(), opacity=self.heatmap_opacity)
-
-        # Add track box to frame
-        if hasattr(self, "track_box") and self.status["track_box"]:
-            for data in self.track_box.BOXES:
-                cv2.rectangle(self.mask, *data["box"].box_config.values())
-                cv2.putText(
-                    self.mask,
-                    str(data["box"].get_value()),
-                    list(data["box"].text_config.values())[0],
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    *list(data["box"].text_config.values())[1:],
+                self.heatmap.decay()
+                self.video.add_image(
+                    image=self.heatmap.get(), opacity=self.heatmap_opacity
                 )
 
-        if thread_queue:
-            thread_queue.put(self.mask)
-        return self.mask
+            # Add track box to frame
+            if hasattr(self, "track_box") and self.status["track_box"]:
+                for data in self.track_box.BOXES:
+                    cv2.rectangle(mask, *data["box"].box_config.values())
+                    cv2.putText(
+                        mask,
+                        str(data["box"].get_value()),
+                        list(data["box"].text_config.values())[0],
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        *list(data["box"].text_config.values())[1:],
+                    )
+
+        # Put result to a safe thread
+        self.queue.put(mask)
+
+    def apply(self, frame: Union[np.ndarray, Mat]) -> Union[np.ndarray, Mat]:
+        """
+        Apply process result to the given frame.
+
+        Args:
+            frame (Union[np.ndarray, Mat]): Input frame to which the overlay will be applied.
+
+        Returns:
+            Union[np.ndarray, Mat]: Frame with overlay applied.
+        """
+
+        # Check if any processes are completed
+        if not self.queue.empty():
+            self.overlay = self.queue.get()
+            self.filter = cv2.cvtColor(self.overlay, cv2.COLOR_BGR2GRAY) != 0
+
+        # Return on result is empty and not mask
+        elif not self.mask:
+            return frame
+
+        if not self.mask:
+            return self.overlay
+
+        if hasattr(self, "overlay"):
+            frame[self.filter] = self.overlay[self.filter]
+
+        return frame
 
     def finish(self) -> None:
         """
