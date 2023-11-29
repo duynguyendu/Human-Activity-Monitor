@@ -1,8 +1,6 @@
 from functools import cached_property
 from typing import Dict, Tuple, Union
 from pathlib import Path
-from queue import Queue
-import threading
 import itertools
 import time
 import os
@@ -23,7 +21,7 @@ class Video:
         speed: int = 1,
         delay: int = 1,
         subsampling: int = 1,
-        sync: bool = False,
+        sync: bool = True,
         resolution: Tuple = None,
         progress_bar: bool = True,
     ) -> None:
@@ -35,7 +33,7 @@ class Video:
             speed (int, optional): Playback speed of the video. Defaults to 1.
             delay (int, optional): Delay between frames in milliseconds. Defaults to 1.
             subsampling (int, optional): Skip frames during processing. Defaults to 1.
-            sync (bool, optional): Synchronize video playback and frame processing. Defaults to False.
+            sync (bool, optional): Synchronize video playback and frame processing. Defaults to True.
             resolution (Tuple, optional): Change resolution of the video. Defaults to None.
             progress_bar (bool, optional): Display progress bar during video playback. Defaults to True.
 
@@ -118,9 +116,6 @@ class Video:
         # Initialize
         self.pause = False
 
-        # Safe thread to store backbone output
-        self.backbone_result = Queue()
-
         # Setup progress bar
         self.setup_progress_bar(show=self.progress_bar)
 
@@ -148,29 +143,11 @@ class Video:
         if hasattr(self, "backbone"):
             # Check subsampling
             if (self.progress.n % self.subsampling) == 0:
-                # Create a new thread if the backbone process does not exist or is not running
-                if (
-                    not hasattr(self, "backbone_process")
-                    or not self.backbone_process.is_alive()
-                ):
-                    # Spam a new thread
-                    self.backbone_process = threading.Thread(
-                        target=self.backbone.apply,
-                        args=(self.current_frame, self.backbone_result),
-                        daemon=True,
-                    )
+                # Process the current frame
+                self.backbone.process(self.current_frame)
 
-                    # Start running the thread
-                    self.backbone_process.start()
-
-                # Retrieve a new overlay and mask if any threads have completed
-                if not self.backbone_result.empty():
-                    self.overlay = self.backbone_result.get()
-                    self.mask = cv2.cvtColor(self.overlay, cv2.COLOR_BGR2GRAY) != 0
-
-            # Apply mask to current frame
-            if hasattr(self, "overlay"):
-                self.current_frame[self.mask] = self.overlay[self.mask]
+            # Apply to current frame
+            self.current_frame = self.backbone.apply(self.current_frame)
 
         # Recorder the video
         if hasattr(self, "recorder"):
@@ -274,7 +251,7 @@ class Video:
         Args:
             config (Dict): Configuration for the backbone
         """
-        self.backbone = Backbone(video=self, config=config)
+        self.backbone = Backbone(video=self, config=config, **config["backbone"])
 
     def setup_progress_bar(self, show: bool) -> None:
         """
