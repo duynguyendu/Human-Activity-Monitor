@@ -1,0 +1,9 @@
+# Configuration for backbone process
+
+
+backbone:
+  # Run process on a separate thread
+  thread: True
+
+  # Apply the result to a mask instead
+  mask: True

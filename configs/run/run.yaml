@@ -11,6 +11,7 @@ device: auto
 defaults:
   - _self_
   - video
+  - backbone
   - detector
   - classifier
   - features:
