@@ -22,6 +22,7 @@ class Backbone:
         video: "Video",
         mask: bool = False,
         thread: bool = False,
+        background: bool = False,
         config: Dict = None,
     ) -> None:
         """
@@ -31,24 +32,29 @@ class Backbone:
             video (Video): An object representing the video input.
             mask (bool): Apply the result to a mask instead. Default to False.
             thread (bool): Run process on a separate thread. Default to False.
+            background (bool): Allow process to run on background. Default to False.
             config (Dict): Configuration settings for different processes.
         """
         self.video = video
         self.mask = mask
         self.thread = thread
+        self.background = background
         self.queue = Queue()
 
-        # Process status
-        self.status = {
-            process: False
-            for process in [
-                "detector",
-                "classifier",
-                "human_count",
-                "heatmap",
-                "track_box",
-            ]
-        }
+        # Process status:
+        #   True by default
+        self.status = {"detector": True, "human_count": True}
+        #   False by default
+        self.status.update(
+            {
+                process: False
+                for process in [
+                    "classifier",
+                    "heatmap",
+                    "track_box",
+                ]
+            }
+        )
 
         print("[bold]Summary:[/]")
 
@@ -73,6 +79,12 @@ class Backbone:
             Union[np.ndarray, Mat]: The output frame.
         """
         return self.process(frame)
+
+    def __process_is_activate(self, name: str, background: bool = False) -> bool:
+        """Check if a process is activate"""
+        return hasattr(self, name) and (
+            self.status[name] or (self.background if background else False)
+        )
 
     @cached_property
     def new_mask(self) -> np.ndarray:
@@ -132,10 +144,10 @@ class Backbone:
                 self.video.stem,
                 config["save"]["save_name"],
             )
-            self.human_count.save(
+            self.human_count.config_save(
                 save_path=save_path + ".csv",
                 interval=config["save"]["interval"],
-                fps=self.video.fps,
+                fps=int(self.video.fps / self.video.subsampling),
                 speed=self.video.speed,
             )
             print(f"  [bold]Save counted people to:[/] [green]{save_path}.csv[/]")
@@ -172,7 +184,7 @@ class Backbone:
             if config["save"]["video"]:
                 self.heatmap.save_video(
                     save_path=save_path + ".mp4",
-                    fps=self.video.fps,
+                    fps=self.video.fps / self.video.subsampling,
                     size=save_res,
                 )
                 print(f"  [bold]Save heatmap video to:[/] [green]{save_path}.mp4[/]")
@@ -241,7 +253,7 @@ class Backbone:
         mask = deepcopy(self.new_mask if self.mask else frame)
 
         # Skip all of the process if detector is not specified
-        if hasattr(self, "detector") and self.status["detector"]:
+        if self.__process_is_activate("detector", background=True):
             # Get detector output
             boxes = self.detector(frame)
 
@@ -272,7 +284,7 @@ class Backbone:
                 center = ((x1 + x2) // 2, (y1 + y2) // 2)
 
                 # Check detector show options
-                if self.show_detected:
+                if self.__process_is_activate("detector") and self.show_detected:
                     # Apply dynamic color
                     color = (
                         dynamic_color(detect_output["score"])
@@ -325,11 +337,7 @@ class Backbone:
                     )
 
                 # Classification
-                if (
-                    hasattr(self, "classifier")
-                    and self.show_classified
-                    and self.status["classifier"]
-                ):
+                if self.__process_is_activate("classifier") and self.show_classified:
                     # Add box margin
                     box_margin = 10
                     human_box = frame[
@@ -364,19 +372,16 @@ class Backbone:
                     )
 
                 # Update heatmap
-                if hasattr(self, "heatmap") and self.status["heatmap"]:
-                    self.heatmap.update(area=(x1, y1, x2, y2))
+                if self.__process_is_activate("heatmap", background=True):
+                    self.heatmap.check(area=(x1, y1, x2, y2))
 
                 # Check for track box
-                if hasattr(self, "track_box") and self.status["track_box"]:
+                if self.__process_is_activate("track_box"):
                     self.track_box.check(pos=center)
 
             # Apply heatmap
-            if hasattr(self, "heatmap") and self.status["heatmap"]:
-                self.heatmap.decay()
-                self.video.add_image(
-                    image=self.heatmap.get(), opacity=self.heatmap_opacity
-                )
+            if self.__process_is_activate("heatmap", background=True):
+                self.heatmap.update()
 
             # Add track box to frame
             if hasattr(self, "track_box") and self.status["track_box"]:
@@ -413,9 +418,22 @@ class Backbone:
         elif not self.mask:
             return frame
 
+        # Enable heatmap
+        if self.__process_is_activate("heatmap") and hasattr(self.heatmap, "heatmap"):
+            cv2.addWeighted(
+                src1=self.heatmap.get(),
+                alpha=self.heatmap_opacity,
+                src2=frame,
+                beta=1 - self.heatmap_opacity,
+                gamma=0,
+                dst=frame,
+            )
+
+        # Return overlay when not using mask
         if not self.mask:
             return self.overlay
 
+        # Check if first run
         if hasattr(self, "overlay"):
             frame[self.filter] = self.overlay[self.filter]
 

@@ -3,7 +3,10 @@
 
 backbone:
   # Run process on a separate thread
-  thread: True
+  thread: true
 
   # Apply the result to a mask instead
-  mask: True
+  mask: true
+
+  # Allow process to run on background
+  background: true

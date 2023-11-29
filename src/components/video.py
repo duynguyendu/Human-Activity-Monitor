@@ -48,7 +48,7 @@ class Video:
         self.video_capture = cv2.VideoCapture(path)
         self.__check_speed(speed)
         self.wait = int(delay)
-        self.subsampling = max(1, subsampling)
+        self.subsampling = max(1, int(subsampling))
         self.sync = bool(sync)
         self.resolution = tuple_handler(resolution, max_dim=2) if resolution else None
         self.progress_bar = bool(progress_bar)
