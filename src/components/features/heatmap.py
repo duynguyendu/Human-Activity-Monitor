@@ -29,15 +29,15 @@ class Heatmap:
         self.decay_value = decay_value
         self.blurriness = blurriness
 
-    def update(self, area: Tuple) -> np.ndarray:
+    def check(self, area: Tuple) -> None:
         """
-        Update map layer
+        Check the area to update the map layer
 
         Args:
             area (int): Area to increase
 
         Returns:
-            np.ndarray: Layer after updated
+            None
         """
 
         # Grow
@@ -48,42 +48,27 @@ class Heatmap:
             self.layer[y1:y2, x1:x2] + self.grow_value, 255 - self.grow_value
         )
 
-    def decay(self) -> None:
-        """
-        Reduce heatmap
+    def update(self) -> None:
+        """Update the heatmap"""
 
-        Args:
-            value (int): percentage to decrease
-        """
+        # Decay
         self.layer = ((1 - self.decay_value / 100) * self.layer).astype(np.uint8)
-
-    def get(self) -> np.ndarray:
-        """
-        Get the current heatmap
-
-        Args:
-            image (np.ndarray): image to apply heatmap
-
-        Returns:
-            np.ndarray: result image
-        """
 
         # Blur
         blurriness = int(self.blurriness * 100)
         blurriness = blurriness + 1 if blurriness % 2 == 0 else blurriness
         self.layer = cv2.stackBlur(self.layer, (blurriness, blurriness), 0)
 
-        # Apply heat to layer
-        heatmap = cv2.applyColorMap(self.layer, cv2.COLORMAP_TURBO)
+        self.heatmap = cv2.applyColorMap(self.layer, cv2.COLORMAP_TURBO)
 
         # Check if save video
         if hasattr(self, "_video_writer"):
-            self._video_writer.write(heatmap)
+            self._video_writer.write(self.heatmap)
 
         # Check if save image
         if hasattr(self, "_image_writer"):
             self._image_writer["count"] += 1
-            self._image_writer["image"] += heatmap
+            self._image_writer["image"] += self.heatmap
             cv2.imwrite(
                 self._image_writer["path"],
                 (self._image_writer["image"] / self._image_writer["count"]).astype(
@@ -91,7 +76,14 @@ class Heatmap:
                 ),
             )
 
-        return heatmap
+    def get(self) -> np.ndarray:
+        """
+        Get the current heatmap
+
+        Returns:
+            np.ndarray: Image result
+        """
+        return self.heatmap
 
     def save_video(
         self, save_path: str, fps: int, size: Tuple, codec: str = "mp4v"
@@ -122,7 +114,8 @@ class Heatmap:
         )
 
     def save_image(self, save_path: str, size: Tuple) -> None:
-        """Save an image to the specified path with the given size.
+        """
+        Save an image to the specified path with the given size.
 
         Args:
             save_path (str): The path where the image will be saved.
