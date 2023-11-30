@@ -1,7 +1,9 @@
 from functools import cached_property
 from typing import Dict, Tuple, Union
+from collections import deque
 from pathlib import Path
 import itertools
+import math
 import time
 import os
 
@@ -24,6 +26,7 @@ class Video:
         sync: bool = True,
         resolution: Tuple = None,
         progress_bar: bool = True,
+        show_fps: Union[Dict, bool] = None,
     ) -> None:
         """
         Initializes a Video object.
@@ -36,6 +39,7 @@ class Video:
             sync (bool, optional): Synchronize video playback and frame processing. Defaults to True.
             resolution (Tuple, optional): Change resolution of the video. Defaults to None.
             progress_bar (bool, optional): Display progress bar during video playback. Defaults to True.
+            show_fps (bool, optional): Display video real-time FPS. Default to None.
 
         Raises:
             FileExistsError: If the file is not found.
@@ -52,6 +56,8 @@ class Video:
         self.sync = bool(sync)
         self.resolution = tuple_handler(resolution, max_dim=2) if resolution else None
         self.progress_bar = bool(progress_bar)
+        if show_fps:
+            self.__setup_fps_display(show_fps if isinstance(show_fps, dict) else {})
 
     def __check_speed(self, value: Union[int, float]) -> None:
         """
@@ -64,15 +70,21 @@ class Video:
         if isinstance(value, float):
             self.speed_mul = value / self.speed
 
+    def __setup_fps_display(self, config: Union[Dict, bool]) -> None:
+        """
+        Setup for display video FPS
+
+        Args:
+            config (Dict or bool): Configuration or `None` for default
+        """
+        self.fps_history = deque(maxlen=config.get("smoothness", 30))
+        self.fps_pos = tuple_handler(config.get("position", (20, 40)), max_dim=2)
+
     def __resync(func):
         """Synchronize video speed with fps"""
 
         # Create wrapper function
         def wrapper(self):
-            # Check if sync is disable
-            if not self.sync:
-                return func(self)
-
             # Check on first run
             if not hasattr(self, "start_time"):
                 self.start_time = time.time()
@@ -82,13 +94,26 @@ class Video:
 
             # Get delay time
             delay = time.time() - self.start_time
-            # Calculate sync value
-            sync_time = (
-                1 / self.fps / (self.speed_mul if hasattr(self, "speed_mul") else 1)
-            )
-            # Apply sync if needed
-            if delay < sync_time:
-                time.sleep(sync_time - delay)
+
+            # Check if sync is enable
+            if self.sync:
+                # Calculate sync value
+                sync_time = (
+                    1 / self.fps / (self.speed_mul if hasattr(self, "speed_mul") else 1)
+                )
+                # Apply sync if needed
+                if delay < sync_time:
+                    time.sleep(sync_time - delay)
+
+            # Display fps if specified
+            if hasattr(self, "fps_history"):
+                self.fps_history.append(math.ceil(1 / (time.time() - self.start_time)))
+                self.add_text(
+                    text=f"FPS: {math.ceil(np.mean(self.fps_history))}",
+                    pos=self.fps_pos,
+                    thickness=2,
+                )
+
             # Setup for new circle
             self.start_time = time.time()
 
@@ -161,10 +186,6 @@ class Video:
         self.progress.update(
             max(1, min(self.speed, self.total_frame - self.progress.n))
         )
-
-        # Sync frame speed
-        if self.sync:
-            self.__resync()
 
         # Return current frame
         return self.current_frame

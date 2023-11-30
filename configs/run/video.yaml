@@ -23,6 +23,14 @@ video:
   # Display video progress
   progress_bar: true
 
+  # Display video FPS
+  show_fps:
+    # Increasing the value makes the output more stable but the response is slower
+    smoothness: 30
+
+    # FPS display potition
+    position: [20, 40]
+
 # Save output
 record:
   # Save path
