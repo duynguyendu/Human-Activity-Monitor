@@ -131,7 +131,7 @@ class Heatmap:
         self._image_writer = {
             "path": save_path,
             "count": 0,
-            "image": np.zeros(tuple_handler((*size, 3), max_dim=3), dtype=np.float32),
+            "image": np.zeros(shape=(*size, 3), dtype=np.float32),
         }
 
     def release(self):
