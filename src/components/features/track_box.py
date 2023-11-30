@@ -41,8 +41,8 @@ class Box:
             "thickness": box_thickness,
         }
         self.text_config = {
-            "pos": tuple(x + y for x, y in zip(top_left, text_pos_adjust)),
-            "font_scale": font_scale,
+            "org": tuple(x + y for x, y in zip(top_left, text_pos_adjust)),
+            "fontScale": font_scale,
             "color": color,
             "thickness": text_thickness,
         }

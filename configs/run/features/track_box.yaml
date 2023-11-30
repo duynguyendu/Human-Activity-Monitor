@@ -20,16 +20,10 @@ track_box:
   # Box areas to track
   boxes:
     - name: top table
-      top_left: [ 500, 30 ]
-      bottom_right: [ 890, 220 ]
+      top_left: [ 450, 30 ]
+      bottom_right: [ 1170, 250 ]
       smoothness: 15
       color: [ 225, 0, 0 ]
-
-    - name: lower table
-      top_left: [ 500, 235 ]
-      bottom_right: [ 850, 500 ]
-      smoothness: 15
-      color: [ 0, 255, 0 ]
 
     - name: door
       top_left: [ 222, 100 ]

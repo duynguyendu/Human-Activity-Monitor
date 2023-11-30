@@ -388,11 +388,10 @@ class Backbone:
                 for data in self.track_box.BOXES:
                     cv2.rectangle(mask, *data["box"].box_config.values())
                     cv2.putText(
-                        mask,
-                        str(data["box"].get_value()),
-                        list(data["box"].text_config.values())[0],
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        *list(data["box"].text_config.values())[1:],
+                        img=mask,
+                        text=str(data["box"].get_value()),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        **data["box"].text_config,
                     )
 
         # Put result to a safe thread
