@@ -337,8 +337,8 @@ class Backbone:
                     # Add box margin
                     box_margin = 10
                     human_box = frame[
-                        y1 - box_margin : y2 + box_margin,
-                        x1 - box_margin : x2 + box_margin,
+                        max(0, y1 - box_margin) : min(frame.shape[1], y2 + box_margin),
+                        max(0, x1 - box_margin) : min(frame.shape[1], x2 + box_margin),
                     ]
 
                     # Get model output
