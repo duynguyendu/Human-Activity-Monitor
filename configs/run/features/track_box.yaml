@@ -22,7 +22,7 @@ track_box:
     - name: top table
       top_left: [ 450, 30 ]
       bottom_right: [ 1170, 250 ]
-      smoothness: 15
+      smoothness: 5
       color: [ 225, 0, 0 ]
 
     - name: door

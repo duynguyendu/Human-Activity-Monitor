@@ -337,7 +337,11 @@ class Backbone:
                     )
 
                 # Classification
-                if self.__process_is_activate("classifier") and self.show_classified:
+                if (
+                    self.__process_is_activate("detector")
+                    and self.__process_is_activate("classifier")
+                    and self.show_classified
+                ):
                     # Add box margin
                     box_margin = 10
                     human_box = frame[

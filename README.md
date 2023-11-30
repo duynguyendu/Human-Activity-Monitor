@@ -1,4 +1,4 @@
-# Human-Activity-Recognition
+# Human-Activity-Monitor
 
 ## Install
 > Recommend to use [Conda](https://docs.conda.io/projects/miniconda/en/latest/)
