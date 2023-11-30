@@ -157,27 +157,19 @@ class Backbone:
                 config["save"]["save_name"],
             )
 
-            # Config save resolution
-            save_res = (
-                tuple_handler(config["save"]["resolution"], max_dim=2)
-                if config["save"]["resolution"]
-                else self.video.size()
-            )
-
             # Save video
             if config["save"]["video"]:
                 self.heatmap.save_video(
                     save_path=save_path + ".mp4",
                     fps=self.video.fps / self.video.subsampling,
-                    size=save_res,
+                    size=self.video.size(),
                 )
                 print(f"  [bold]Save heatmap video to:[/] [green]{save_path}.mp4[/]")
 
             # Save image
             if config["save"]["image"]:
                 self.heatmap.save_image(
-                    save_path=save_path + ".jpg",
-                    size=save_res[::-1],
+                    save_path=save_path + ".jpg", size=self.video.size(reverse=True)
                 )
                 print(f"  [bold]Save heatmap image to:[/] [green]{save_path}.jpg[/]")
 
@@ -426,10 +418,10 @@ class Backbone:
             cv2.addWeighted(
                 src1=self.heatmap.get(),
                 alpha=self.heatmap_opacity,
-                src2=frame,
+                src2=frame if self.mask else self.overlay,
                 beta=1 - self.heatmap_opacity,
                 gamma=0,
-                dst=frame,
+                dst=frame if self.mask else self.overlay,
             )
 
         # Return overlay when not using mask
