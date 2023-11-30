@@ -44,7 +44,7 @@ class Video:
             raise FileExistsError(
                 "File not found. Check again or use an absolute path."
             )
-        self.path = path
+        self.path = str(path)
         self.video_capture = cv2.VideoCapture(path)
         self.__check_speed(speed)
         self.wait = int(delay)
@@ -158,7 +158,9 @@ class Video:
             )
 
         # Update progress
-        self.progress.update(min(self.speed, self.total_frame - self.progress.n))
+        self.progress.update(
+            max(1, min(self.speed, self.total_frame - self.progress.n))
+        )
 
         # Sync frame speed
         if self.sync:
@@ -184,7 +186,7 @@ class Video:
         Returns:
             str: name of the video
         """
-        return str(Path(self.path).name)
+        return self.path.split("/")[-1]
 
     @cached_property
     def stem(self) -> str:
@@ -194,7 +196,7 @@ class Video:
         Returns:
             str: name of the video without extension
         """
-        return str(Path(self.path).stem)
+        return self.name.split(".")[0]
 
     @cached_property
     def cap(self) -> cv2.VideoCapture:
