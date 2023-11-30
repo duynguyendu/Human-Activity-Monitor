@@ -29,6 +29,3 @@ heatmap:
 
     # Save name
     save_name: heatmap
-
-    # Output resolution
-    resolution: [ 1280, 720 ]
