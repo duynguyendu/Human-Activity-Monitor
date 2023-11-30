@@ -66,7 +66,7 @@ class Backbone:
                     if process not in ["detector", "classifier"]
                     else [config[process], config["device"]]
                 )
-                getattr(self, f"setup_{process}")(*args)
+                getattr(self, f"_setup_{process}")(*args)
 
     def __call__(self, frame: Union[np.ndarray, Mat]) -> Union[np.ndarray, Mat]:
         """
@@ -80,23 +80,7 @@ class Backbone:
         """
         return self.process(frame)
 
-    def __process_is_activate(self, name: str, background: bool = False) -> bool:
-        """Check if a process is activate"""
-        return hasattr(self, name) and (
-            self.status[name] or (self.background if background else False)
-        )
-
-    @cached_property
-    def new_mask(self) -> np.ndarray:
-        """
-        Return new video mask
-
-        Returns:
-            np.ndarray: new mask
-        """
-        return np.zeros((*self.video.size(reverse=True), 3), dtype=np.uint8)
-
-    def setup_detector(self, config: Dict, device: str) -> None:
+    def _setup_detector(self, config: Dict, device: str) -> None:
         """
         Sets up the detector module with the specified configuration.
 
@@ -111,7 +95,7 @@ class Backbone:
         self.show_detected = config["show"]
         self.track = config["model"]["track"]
 
-    def setup_classifier(self, config: Dict, device: str) -> None:
+    def _setup_classifier(self, config: Dict, device: str) -> None:
         """
         Sets up the classifier module with the specified configuration.
 
@@ -125,7 +109,7 @@ class Backbone:
         self.classifier = Classifier(**config["model"], device=device)
         self.show_classified = config["show"]
 
-    def setup_human_count(self, config: Dict) -> None:
+    def _setup_human_count(self, config: Dict) -> None:
         """
         Sets up the human count module with the specified configuration.
 
@@ -152,7 +136,7 @@ class Backbone:
             )
             print(f"  [bold]Save counted people to:[/] [green]{save_path}.csv[/]")
 
-    def setup_heatmap(self, config: Dict) -> None:
+    def _setup_heatmap(self, config: Dict) -> None:
         """
         Sets up the heatmap module with the specified configuration.
 
@@ -197,7 +181,7 @@ class Backbone:
                 )
                 print(f"  [bold]Save heatmap image to:[/] [green]{save_path}.jpg[/]")
 
-    def setup_track_box(self, config: Dict) -> None:
+    def _setup_track_box(self, config: Dict) -> None:
         """
         Sets up the track box module with the specified configuration.
 
@@ -210,7 +194,23 @@ class Backbone:
         self.track_box = TrackBox(**config["default"])
         [self.track_box.new(**box) for box in config["boxes"]]
 
-    def threaded_process(func):
+    @cached_property
+    def __new_mask(self) -> np.ndarray:
+        """
+        Return new video mask
+
+        Returns:
+            np.ndarray: new mask
+        """
+        return np.zeros((*self.video.size(reverse=True), 3), dtype=np.uint8)
+
+    def __process_is_activate(self, name: str, background: bool = False) -> bool:
+        """Check if a process is activate"""
+        return hasattr(self, name) and (
+            self.status[name] or (self.background if background else False)
+        )
+
+    def __threaded_process(func):
         """Move process to a separate thread"""
 
         def wrapper(self, frame):
@@ -237,7 +237,7 @@ class Backbone:
 
         return wrapper
 
-    @threaded_process
+    @__threaded_process
     def process(self, frame: Union[np.ndarray, Mat]) -> None:
         """
         Process the input frame.
@@ -250,7 +250,7 @@ class Backbone:
         """
 
         # Check mask option
-        mask = deepcopy(self.new_mask if self.mask else frame)
+        mask = deepcopy(self.__new_mask if self.mask else frame)
 
         # Skip all of the process if detector is not specified
         if self.__process_is_activate("detector", background=True):
