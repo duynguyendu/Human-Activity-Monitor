@@ -26,6 +26,7 @@ class Detector:
         optimize: bool = False,
         backend: str = None,
         device: str = "auto",
+        **kwargs
     ):
         """
         Initialize the Yolo-v8 model
@@ -58,6 +59,7 @@ class Detector:
                 "half": self.__check_half(half),
                 "device": self.device,
             },
+            **kwargs
         )
 
     def __call__(self, image: Union[cv2.Mat, np.ndarray]) -> List[Tuple]:
@@ -118,6 +120,7 @@ class Detector:
         optimize: bool,
         backend: str,
         config: Dict,
+        **kwargs
     ) -> partial:
         """
         Create and configure the YOLO model based on the provided parameters.
@@ -153,7 +156,7 @@ class Detector:
             model = model.predict
 
         # Return a partially configured YOLO model
-        return partial(model, **config, classes=0, verbose=False)
+        return partial(model, **config, classes=0, verbose=False, **kwargs)
 
     def __check_half(self, half: bool) -> bool:
         """
