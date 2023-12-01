@@ -56,8 +56,7 @@ class Video:
         self.sync = bool(sync)
         self.resolution = tuple_handler(resolution, max_dim=2) if resolution else None
         self.__setup_progress_bar(show=progress_bar)
-        if show_fps:
-            self.__setup_fps_display(show_fps if isinstance(show_fps, dict) else {})
+        self.__setup_fps_display(config=show_fps)
 
     def __check_speed(self, value: Union[int, float]) -> None:
         """
@@ -92,10 +91,11 @@ class Video:
         Setup for display video FPS
 
         Args:
-            config (Dict or bool): Configuration or `None` for default
+            config (Dict or bool): Configuration or `True` for default
         """
-        self.fps_history = deque(maxlen=config.get("smoothness", 30))
-        self.fps_pos = tuple_handler(config.get("position", (20, 40)), max_dim=2)
+        if config not in [False, None]:
+            self.fps_history = deque(maxlen=config.get("smoothness", 30))
+            self.fps_pos = tuple_handler(config.get("position", (20, 40)), max_dim=2)
 
     def __resync(func):
         """Synchronize video speed with fps"""
