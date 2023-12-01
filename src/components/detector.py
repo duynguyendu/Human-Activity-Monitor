@@ -193,7 +193,7 @@ class Detector:
             for box in result.boxes:
                 outputs.append(
                     {
-                        "box": (int(i.item()) for i in box.xyxy[0]),
+                        "box": [int(i.item()) for i in box.xyxy[0]],
                         "score": box.conf.item(),
                         "id": int(box.id.item()) if box.is_track else None,
                     }
