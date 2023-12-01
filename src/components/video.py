@@ -55,7 +55,7 @@ class Video:
         self.subsampling = max(1, int(subsampling))
         self.sync = bool(sync)
         self.resolution = tuple_handler(resolution, max_dim=2) if resolution else None
-        self.setup_progress_bar(show=progress_bar)
+        self.__setup_progress_bar(show=progress_bar)
         if show_fps:
             self.__setup_fps_display(show_fps if isinstance(show_fps, dict) else {})
 
@@ -69,6 +69,23 @@ class Video:
         self.speed = int(max(1, value))
         if isinstance(value, float):
             self.speed_mul = value / self.speed
+
+    def __setup_progress_bar(self, show: bool) -> None:
+        """
+        Initializes and sets up a progress bar using tqdm.
+
+        Args:
+            show (bool): Flag to determine whether to show the progress bar.
+        """
+        self.progress = tqdm(
+            disable=not show,
+            total=self.total_frame,
+            desc=f"  {self.name}",
+            unit=" frame",
+            smoothing=0.3,
+            delay=0.1,
+            colour="cyan",
+        )
 
     def __setup_fps_display(self, config: Union[Dict, bool]) -> None:
         """
@@ -141,7 +158,7 @@ class Video:
         # Initialize
         self.pause = False
 
-        print("[bold]Video progress:[/]")
+        # print("[bold]Video progress:[/]")
 
         return self
 
@@ -272,35 +289,6 @@ class Video:
             config (Dict): Configuration for the backbone
         """
         self.backbone = Backbone(video=self, config=config, **config["backbone"])
-
-    def setup_progress_bar(self, show: bool) -> None:
-        """
-        Initializes and sets up a progress bar using tqdm.
-
-        Args:
-            show (bool): Flag to determine whether to show the progress bar.
-
-        Returns:
-            None
-        """
-        self.progress = tqdm(
-            disable=not show,
-            total=self.total_frame,
-            desc=f"  {self.name}",
-            unit=" frame",
-            smoothing=0.3,
-            delay=0.1,
-            colour="cyan",
-        )
-
-    def custom_progress_bar(self, tqdm: tqdm) -> None:
-        """
-        Sets a custom tqdm progress bar for the instance.
-
-        Args:
-            tqdm: An instance of the tqdm class representing a custom progress bar.
-        """
-        self.progress = tqdm
 
     def custom_shortcut(self, values: Dict):
         """
