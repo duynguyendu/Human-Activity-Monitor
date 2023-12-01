@@ -55,7 +55,7 @@ class Video:
         self.subsampling = max(1, int(subsampling))
         self.sync = bool(sync)
         self.resolution = tuple_handler(resolution, max_dim=2) if resolution else None
-        self.progress_bar = bool(progress_bar)
+        self.setup_progress_bar(show=progress_bar)
         if show_fps:
             self.__setup_fps_display(show_fps if isinstance(show_fps, dict) else {})
 
@@ -141,10 +141,7 @@ class Video:
         # Initialize
         self.pause = False
 
-        # Setup progress bar
-        self.setup_progress_bar(show=self.progress_bar)
-
-        print(f"[bold]Video progress:[/]")
+        print("[bold]Video progress:[/]")
 
         return self
 
