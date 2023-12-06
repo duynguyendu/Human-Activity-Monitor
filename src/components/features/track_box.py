@@ -1,5 +1,6 @@
-from typing import Tuple, Union
+from typing import Dict, Tuple, Union, Iterable
 from collections import deque
+import cv2
 
 import numpy as np
 
@@ -9,6 +10,7 @@ from src.modules.utils import tuple_handler
 class Box:
     def __init__(
         self,
+        name: str,
         top_left: Tuple,
         bottom_right: Tuple,
         smoothness: int,
@@ -22,6 +24,7 @@ class Box:
         Initialize a box with given top-left and bottom-right coordinates.
 
          Args:
+            name (str): Name of the box.
             top_left (Tuple): Top-left corner coordinates (x, y).
             bottom_right (Tuple): Bottom-right corner coordinates (x, y).
             smoothness (int): Number of frames for smoothing. Defaults to 1.
@@ -31,12 +34,13 @@ class Box:
             font_scale (int): Font scale for the displayed text.
             text_thickness (int): Thickness of the text.
         """
+        self.name = str(name)
         self.xyxy = (*top_left, *bottom_right)
         self.history = deque([], maxlen=smoothness)
         self.count = 0
         self.box_config = {
-            "top_left": top_left,
-            "bottom_right": bottom_right,
+            "pt1": top_left,
+            "pt2": bottom_right,
             "color": color,
             "thickness": box_thickness,
         }
@@ -72,9 +76,28 @@ class Box:
         self.count = 0
         return int(np.mean(self.history))
 
+    def apply(self, image: Union[cv2.Mat, np.ndarray]) -> Union[cv2.Mat, np.ndarray]:
+        """
+        Apply result to the given image
+
+        Args:
+            image (Union[cv2.Mat, np.ndarray]): Input image
+
+        Returns:
+            Union[cv2.Mat, np.ndarray]: Result image
+        """
+        image = cv2.rectangle(image, **self.box_config)
+        image = cv2.putText(
+            img=image,
+            text=str(self.get_value()),
+            fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+            **self.text_config,
+        )
+        return image
+
 
 class TrackBox:
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, default_config: Dict, boxes: Iterable[Dict]) -> None:
         """
         Initialize a TrackBox class with given default configuration
 
@@ -86,63 +109,23 @@ class TrackBox:
             font_scale (int): Font scale for the displayed text.
             text_thickness (int): Thickness of the text.
         """
-        self.default_config = kwargs
-        self.BOXES = list()
+        self.default_config = default_config
+        self.boxes = [self.new(box_config) for box_config in boxes]
 
-    def new(self, **kwargs) -> "Box":
+    def new(self, config: Dict) -> None:
         """
         Create a new tracked box.
 
         Args:
-            name (str): Name of the box.
-            top_left (Tuple): Top-left corner coordinates (x, y).
-            bottom_right (Tuple): Bottom-right corner coordinates (x, y).
-            smoothness (int, optional): Number of frames for smoothing. Defaults to 1.
-            color (Tuple, optional): RGB values representing the color of the box and text.
-            box_thickness (int, optional): Thickness of the box border.
-            text_pos_adjust (Tuple, optional): Adjustment to the top-left corner for text positioning.
-            font_scale (int, optional): Font scale for the displayed text.
-            text_thickness (int, optional): Thickness of the text.
-
-        Returns:
-            Box: The created box.
+            config (Dict): Configuration of the box
         """
-        kwargs.update((k, v) for k, v in self.default_config.items() if k not in kwargs)
-        box = {"name": str(kwargs.pop("name")), "box": Box(**kwargs)}
-        self.BOXES.append(box)
-        return box
-
-    def get(self, name: str) -> Union["Box", None]:
-        """
-        Get a box by name.
-
-        Args:
-            name (str): Name of the box.
-
-        Returns:
-            Union[Box, None]: The box if found, otherwise None.
-        """
-        for box in self.BOXES:
-            if str(name) == box["name"]:
-                return box["box"]
-        else:
-            return None
-
-    def remove(self, name: str) -> None:
-        """
-        Remove a box by name.
-
-        Args:
-            name (str): Name of the box.
-
-        Raises:
-            ValueError: If the box with the specified name is not found.
-        """
-        box = self.get(name)
-        if box:
-            self.BOXES.remove({"name": name, "box": box})
-        else:
-            raise ValueError(f"The box named '{name}' was not found")
+        return Box(
+            **config,
+            text_pos_adjust=self.default_config["text"]["position"],
+            font_scale=self.default_config["text"]["font_scale"],
+            text_thickness=self.default_config["text"]["thickness"],
+            box_thickness=self.default_config["box"]["thickness"],
+        )
 
     def check(self, pos: Tuple) -> None:
         """
@@ -151,4 +134,17 @@ class TrackBox:
         Args:
             pos (Tuple): Position coordinates (x, y).
         """
-        [box["box"].check(pos) for box in self.BOXES]
+        [box.check(pos) for box in self.boxes]
+
+    def apply(self, image: Union[cv2.Mat, np.ndarray]) -> Union[cv2.Mat, np.ndarray]:
+        """
+        Apply result to the given image
+
+        Args:
+            image (Union[cv2.Mat, np.ndarray]): Input image
+
+        Returns:
+            Union[cv2.Mat, np.ndarray]: Result image
+        """
+        [box.apply(image) for box in self.boxes]
+        return image

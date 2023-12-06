@@ -183,8 +183,9 @@ class Backbone:
         Returns:
             None
         """
-        self.track_box = TrackBox(**config["default"])
-        [self.track_box.new(**box) for box in config["boxes"]]
+        self.track_box = TrackBox(
+            default_config=config["default"], boxes=config["boxes"]
+        )
 
     @cached_property
     def __new_mask(self) -> np.ndarray:
@@ -381,14 +382,7 @@ class Backbone:
 
             # Add track box to frame
             if hasattr(self, "track_box") and self.status["track_box"]:
-                for data in self.track_box.BOXES:
-                    cv2.rectangle(mask, *data["box"].box_config.values())
-                    cv2.putText(
-                        img=mask,
-                        text=str(data["box"].get_value()),
-                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                        **data["box"].text_config,
-                    )
+                self.track_box.apply(mask)
 
         # Put result to a safe thread
         self.queue.put(mask)
