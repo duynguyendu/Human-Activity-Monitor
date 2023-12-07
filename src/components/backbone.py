@@ -1,5 +1,6 @@
 from functools import cached_property
 from typing import Dict, Union
+from datetime import datetime
 from copy import deepcopy
 from queue import Queue
 import threading
@@ -23,7 +24,8 @@ class Backbone:
         mask: bool = False,
         thread: bool = False,
         background: bool = False,
-        config: Dict = None,
+        save: Union[Dict, bool] = None,
+        process_config: Union[Dict, bool] = None,
     ) -> None:
         """
         Initialize the Backbone object.
@@ -33,12 +35,14 @@ class Backbone:
             mask (bool): Apply the result to a mask instead. Default to False.
             thread (bool): Run process on a separate thread. Default to False.
             background (bool): Allow process to run on background. Default to False.
-            config (Dict): Configuration settings for different processes.
+            save (Dict or bool): Configuration for save result.
+            process_config (Dict or bool): Configuration settings for various processes.
         """
         self.video = video
         self.mask = mask
         self.thread = thread
         self.background = background
+        self.__setup_save(config=save)
         self.queue = Queue()
 
         # Process status:
@@ -56,15 +60,15 @@ class Backbone:
             }
         )
 
-        print("[bold]Summary:[/]")
-
         # Setup each process
         for process in self.status:
-            if config.get(process, False) or config["features"].get(process, False):
+            if process_config.get(process, False) or process_config["features"].get(
+                process, False
+            ):
                 args = (
-                    [config["features"][process]]
+                    [process_config["features"][process]]
                     if process not in ["detector", "classifier"]
-                    else [config[process], config["device"]]
+                    else [process_config[process], process_config["device"]]
                 )
                 getattr(self, f"_setup_{process}")(*args)
 
@@ -79,6 +83,36 @@ class Backbone:
             Union[np.ndarray, Mat]: The output frame.
         """
         return self.process(frame)
+
+    def __setup_save(self, config: Union[Dict, bool]) -> None:
+        """
+        Setup for save process result.
+
+        Args:
+            config (Dict or bool): A dictionary of configurations. False for disable.
+        """
+
+        # Disable if config is not provided
+        if not config:
+            return
+
+        # Set save path
+        self.save_path = os.path.join(
+            config["path"],
+            datetime.now().strftime("%d-%m-%Y")
+            if self.video.is_camera
+            else self.video.stem,
+        )
+
+        # Create destination folder
+        if not os.path.exists(self.save_path):
+            os.makedirs(self.save_path, exist_ok=True)
+
+        # Set save frequency
+        self.save_interval = config["interval"]
+
+        # Logging
+        print(f"[INFO] [bold]Save process result to:[/] [green]{self.save_path}[/]")
 
     def _setup_detector(self, config: Dict, device: str) -> None:
         """
@@ -122,19 +156,13 @@ class Backbone:
         self.human_count = HumanCount(smoothness=config["smoothness"])
         self.human_count_position = config["position"]
 
-        if config["save"]:
-            save_path = os.path.join(
-                config["save"]["save_path"],
-                self.video.stem,
-                config["save"]["save_name"],
-            )
+        if hasattr(self, "save_path") and config["save"]:
             self.human_count.config_save(
-                save_path=save_path + ".csv",
-                interval=config["save"]["interval"],
+                save_path=os.path.join(self.save_path, "human_count.csv"),
+                interval=self.save_interval,
                 fps=int(self.video.fps / self.video.subsampling),
                 speed=self.video.speed,
             )
-            print(f"  [bold]Save counted people to:[/] [green]{save_path}.csv[/]")
 
     def _setup_heatmap(self, config: Dict) -> None:
         """
@@ -149,29 +177,20 @@ class Backbone:
         self.heatmap = Heatmap(shape=self.video.size(reverse=True), **config["layer"])
         self.heatmap_opacity = config["opacity"]
 
-        if config["save"]:
-            # Config save path
-            save_path = os.path.join(
-                config["save"]["save_path"],
-                self.video.stem,
-                config["save"]["save_name"],
-            )
-
+        if hasattr(self, "save_path") and config["save"]:
             # Save video
             if config["save"]["video"]:
                 self.heatmap.save_video(
-                    save_path=save_path + ".mp4",
+                    save_path=os.path.join(self.save_path, "heatmap.mp4"),
                     fps=self.video.fps / self.video.subsampling,
                     size=self.video.size(),
                 )
-                print(f"  [bold]Save heatmap video to:[/] [green]{save_path}.mp4[/]")
-
             # Save image
             if config["save"]["image"]:
                 self.heatmap.save_image(
-                    save_path=save_path + ".jpg", size=self.video.size(reverse=True)
+                    save_path=os.path.join(self.save_path, "heatmap.jpg"),
+                    size=self.video.size(reverse=True),
                 )
-                print(f"  [bold]Save heatmap image to:[/] [green]{save_path}.jpg[/]")
 
     def _setup_track_box(self, config: Dict) -> None:
         """

@@ -31,16 +31,16 @@ video:
     # FPS display potition
     position: [20, 40]
 
-# Save output
-record:
-  # Save path
-  save_path: records/
+  # Record video
+  record:
+    # Save destination
+    path: records
 
-  # Save name
-  save_name: output
+    # Save name
+    name: output
 
-  # Custom fps (null for auto)
-  fps: null
+    # Custom fps (null for auto)
+    fps: null
 
-  # Output resolution
-  resolution: null
+    # Output resolution (null for auto)
+    resolution: null

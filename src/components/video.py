@@ -1,7 +1,7 @@
 from functools import cached_property
 from typing import Dict, Tuple, Union
 from collections import deque
-from pathlib import Path
+from datetime import datetime
 import itertools
 import math
 import time
@@ -27,6 +27,7 @@ class Video:
         resolution: Tuple = None,
         progress_bar: bool = True,
         show_fps: Union[Dict, bool] = None,
+        record: Union[Dict, bool] = None,
     ) -> None:
         """
         Initializes a Video object.
@@ -39,7 +40,8 @@ class Video:
             sync (bool, optional): Synchronize video playback and frame processing. Defaults to True.
             resolution (Tuple, optional): Change resolution of the video. Defaults to None.
             progress_bar (bool, optional): Display progress bar during video playback. Defaults to True.
-            show_fps (bool, optional): Display video real-time FPS. Default to None.
+            show_fps (Dict or bool, optional): Display video real-time FPS. Default to None.
+            record (Dict or bool, optional): Record the video. Default to None.
 
         Raises:
             FileExistsError: If the file is not found.
@@ -50,6 +52,7 @@ class Video:
             )
         self.path = str(path)
         self.video_capture = cv2.VideoCapture(path)
+        self.is_camera = bool(self.total_frame == -1)
         self.__check_speed(speed)
         self.wait = int(delay)
         self.subsampling = max(1, int(subsampling))
@@ -57,6 +60,7 @@ class Video:
         self.resolution = tuple_handler(resolution, max_dim=2) if resolution else None
         self.__setup_progress_bar(show=progress_bar)
         self.__setup_fps_display(config=show_fps)
+        self.__setup_recorder(config=record)
 
     def __check_speed(self, value: Union[int, float]) -> None:
         """
@@ -96,6 +100,49 @@ class Video:
         if config not in [False, None]:
             self.fps_history = deque(maxlen=config.get("smoothness", 30))
             self.fps_pos = tuple_handler(config.get("position", (20, 40)), max_dim=2)
+
+    def __setup_recorder(self, config: Union[Dict, bool]) -> None:
+        """
+        Setup for record the video.
+
+        Args:
+            config (Dict or bool): A dictionary of configurations. False for disable.
+        """
+
+        # Disable if config is not provided
+        if not config:
+            return
+
+        # Set save folder
+        save_folder = os.path.join(
+            config["path"],
+            datetime.now().strftime("%d-%m-%Y") if self.is_camera else self.stem,
+        )
+
+        # Create save folder
+        if not os.path.exists(save_folder):
+            os.makedirs(save_folder, exist_ok=True)
+
+        # Config writer
+        save_path = os.path.join(save_folder, config["name"] + ".mp4")
+
+        codec = cv2.VideoWriter_fourcc(*"mp4v")
+
+        fps = float(config["fps"] if config["fps"] else self.fps)
+
+        self.recorder_res = (
+            tuple_handler(config["resolution"], max_dim=2)
+            if config["resolution"]
+            else self.size()
+        )
+
+        # Config writer
+        self.recorder = cv2.VideoWriter(
+            filename=save_path, fourcc=codec, fps=fps, frameSize=self.recorder_res
+        )
+
+        # Logging
+        print(f"[INFO] [bold]Save recorded video to:[/] [green]{save_path}[/]")
 
     def __resync(func):
         """Synchronize video speed with fps"""
@@ -288,7 +335,9 @@ class Video:
         Args:
             config (Dict): Configuration for the backbone
         """
-        self.backbone = Backbone(video=self, config=config, **config["backbone"])
+        self.backbone = Backbone(
+            video=self, process_config=config, **config["backbone"]
+        )
 
     def custom_shortcut(self, values: Dict):
         """
@@ -316,50 +365,6 @@ class Video:
             for prop in [cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT]
         )
         return (w, h) if not reverse else (h, w)
-
-    def record(
-        self,
-        save_path: str = "records",
-        save_name: str = "output",
-        fps: int = None,
-        resolution: Tuple = None,
-        codec: str = "mp4v",
-    ) -> cv2.VideoWriter:
-        """
-        Record the video.
-
-        Args:
-            save_path (str, optional): Path to store the written video. Defaults to "records".
-            save_name (str, optional): Name of the output video file. Defaults to "output".
-            fps (int, optional): Frames per second for the video. If None, it defaults to the original fps of the source video.
-            resolution (Tuple, optional): Resolution of the video (width, height). If None, it defaults to the original size of the source video.
-            codec (str, optional): Codec for writing the video. Defaults to "mp4v".
-
-        Returns:
-            cv2.VideoWriter: Object to write video.
-        """
-        save_path = Path(save_path)
-
-        # Create save folder
-        save_path.parent.mkdir(parents=True, exist_ok=True)
-
-        self.recorder_path = os.path.join(save_path, self.stem, save_name + ".mp4")
-
-        self.recorder_fps = int(fps) if fps else self.fps
-
-        self.recorder_res = tuple_handler(resolution, max_dim=2) if resolution else None
-
-        # Config writer
-        self.recorder = cv2.VideoWriter(
-            filename=self.recorder_path,
-            fourcc=cv2.VideoWriter_fourcc(*codec),
-            fps=self.recorder_fps,
-            frameSize=self.recorder_res,
-        )
-
-        print(f"  [bold]Save recorded video to:[/] [green]{self.recorder_path}.mp4[/]")
-
-        return self.recorder
 
     def add_box(
         self,

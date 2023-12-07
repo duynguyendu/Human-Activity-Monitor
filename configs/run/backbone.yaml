@@ -10,3 +10,11 @@ backbone:
 
   # Allow process to run on background
   background: true
+
+  # Save process result
+  save:
+    # Save folder
+    path: records/
+
+    # Save frequency (second)
+    interval: 1

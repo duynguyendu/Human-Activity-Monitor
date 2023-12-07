@@ -23,9 +23,3 @@ heatmap:
 
     # Write an average image
     image: true
-
-    # Save path
-    save_path: records/
-
-    # Save name
-    save_name: heatmap

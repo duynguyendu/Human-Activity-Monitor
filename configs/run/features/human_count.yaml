@@ -9,10 +9,4 @@ human_count:
   position: [20, 80]
 
   # Save output
-  save:
-    # Save path and name
-    save_path: records/
-    save_name: human_count
-
-    # Frequency (second)
-    interval: 1
+  save: true
