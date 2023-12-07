@@ -162,6 +162,7 @@ class Backbone:
                 interval=self.save_interval,
                 fps=int(self.video.fps / self.video.subsampling),
                 speed=self.video.speed,
+                camera=self.video.is_camera,
             )
 
     def _setup_heatmap(self, config: Dict) -> None:

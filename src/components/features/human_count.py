@@ -1,5 +1,5 @@
 from collections import deque
-from pathlib import Path
+from datetime import datetime
 import numpy as np
 
 
@@ -36,19 +36,14 @@ class HumanCount:
         self.history.append(value)
 
         if hasattr(self, "save_conf"):
-            current = (
-                int(self.save_conf["count"] * self.save_conf["speed"])
-                / self.save_conf["fps"]
-            )
-            if self.save_conf["count"] != 0:
-                if (current % self.save_conf["interval"]) == 0:
-                    with open(self.save_conf["save_path"], "a") as f:
-                        f.write(f"{int(current)},{self.get_value()}\n")
+            # Save value
+            self.save()
 
-            self.save_conf["count"] += 1
+            # Update count
+            self.count += 1
 
     def config_save(
-        self, save_path: str, interval: int, fps: int, speed: int = 1
+        self, save_path: str, interval: int, fps: int, speed: int, camera: bool
     ) -> None:
         """
         Save the counted value
@@ -58,22 +53,40 @@ class HumanCount:
             interval (int): Save every n (second)
             fps (int): Frame per second of the video
             speed (int): Video speed multiplying
-
-        Returns:
-            None
+            camera (bool): If using camera
         """
-        save_path = Path(save_path)
-
-        # Create save folder
-        save_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(save_path, "w") as f:
-            f.write("second,value" + "\n")
+            f.write("time" if camera else "second" + ",value" + "\n")
 
+        self.count = 0
         self.save_conf = {
             "save_path": save_path,
-            "count": 0,
             "interval": interval,
             "fps": fps,
             "speed": max(1, speed),
+            "camera": camera,
         }
+
+    def save(self) -> None:
+        """Save value"""
+
+        # Calculate current
+        current = int(self.count * self.save_conf["speed"]) / self.save_conf["fps"]
+
+        # Not first, check interval
+        if not (self.count != 0 and ((current % self.save_conf["interval"]) == 0)):
+            return
+
+        # Write result
+        with open(self.save_conf["save_path"], "a") as f:
+            time_format = (
+                datetime.now().strftime("%H:%M:%S")
+                if self.save_conf["camera"]
+                else int(current)
+            )
+            f.write(f"{time_format},{self.get_value()}\n")
+
+        # Reset count on camera
+        if self.config_save["camera"]:
+            self.count = 0
