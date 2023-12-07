@@ -69,9 +69,12 @@ class Video:
         Args:
             value (Union[int, float]): Speed value to check.
         """
-        self.speed = int(max(1, value))
-        if isinstance(value, float):
-            self.speed_mul = value / self.speed
+        if self.is_camera:
+            self.speed = 1
+        else:
+            self.speed = int(max(1, value))
+            if isinstance(value, float):
+                self.speed_mul = value / self.speed
 
     def __setup_progress_bar(self, show: bool) -> None:
         """
