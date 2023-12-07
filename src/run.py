@@ -21,9 +21,6 @@ def main(cfg: DictConfig) -> None:
 
     VIDEO.setup_backbone(config=cfg)
 
-    if cfg["record"]:
-        VIDEO.record(**cfg["record"])
-
     VIDEO.run()
 
 
