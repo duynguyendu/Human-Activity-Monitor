@@ -206,6 +206,14 @@ class Backbone:
         self.track_box = TrackBox(
             default_config=config["default"], boxes=config["boxes"]
         )
+        if hasattr(self, "save_path") and config["save"]:
+            self.track_box.config_save(
+                save_path=os.path.join(self.save_path, "track_box.csv"),
+                interval=self.save_interval,
+                fps=int(self.video.fps / self.video.subsampling),
+                speed=self.video.speed,
+                camera=self.video.is_camera,
+            )
 
     @cached_property
     def __new_mask(self) -> np.ndarray:
@@ -402,6 +410,7 @@ class Backbone:
 
             # Add track box to frame
             if hasattr(self, "track_box") and self.status["track_box"]:
+                self.track_box.update()
                 self.track_box.apply(mask)
 
         # Put result to a safe thread

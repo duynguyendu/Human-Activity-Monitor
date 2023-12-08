@@ -18,6 +18,9 @@ track_box:
       # Box thickness
       thickness: 2
 
+  # Save output
+  save: true
+
   # Box areas to track
   boxes:
     # Box name

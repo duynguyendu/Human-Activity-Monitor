@@ -88,5 +88,5 @@ class HumanCount:
             f.write(f"{time_format},{self.get_value()}\n")
 
         # Reset count on camera
-        if self.config_save["camera"]:
+        if self.save_conf["camera"]:
             self.count = 0
