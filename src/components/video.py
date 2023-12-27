@@ -338,9 +338,10 @@ class Video:
         Args:
             config (Dict): Configuration for the backbone
         """
-        self.backbone = Backbone(
-            video=self, process_config=config, **config["backbone"]
-        )
+        if config["backbone"]:
+            self.backbone = Backbone(
+                video=self, process_config=config, **config["backbone"]
+            )
 
     def custom_shortcut(self, values: Dict):
         """
@@ -364,8 +365,12 @@ class Video:
             Tuple: size of the video
         """
         w, h = (
-            int(self.cap.get(prop))
-            for prop in [cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT]
+            self.resolution
+            if self.resolution
+            else (
+                int(self.cap.get(prop))
+                for prop in [cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT]
+            )
         )
         return (w, h) if not reverse else (h, w)
 
