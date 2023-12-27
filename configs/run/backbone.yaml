@@ -9,7 +9,7 @@ backbone:
   mask: true
 
   # Allow process to run on background
-  background: true
+  background: false
 
   # Save process result
   save:
