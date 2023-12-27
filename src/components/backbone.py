@@ -39,7 +39,7 @@ class Backbone:
             process_config (Dict or bool): Configuration settings for various processes.
         """
         self.video = video
-        self.mask = mask
+        self.mask = True if thread else mask
         self.thread = thread
         self.background = background
         self.__setup_save(config=save)
@@ -238,10 +238,6 @@ class Backbone:
             # Check if using Thread
             if not self.thread:
                 return func(self, frame)
-
-            # Turn mask on when using Thread
-            elif not self.mask:
-                self.mask = True
 
             # Only spawn Thread on first run or Thread is free
             if (
