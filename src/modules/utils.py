@@ -1,6 +1,7 @@
 from typing import Union, Tuple, List
 import os
 
+from rich import print
 import torch
 
 
@@ -12,7 +13,7 @@ def device_handler(value: str = "auto") -> str:
     Handles the specification of device choice.
 
     Args:
-        value (str): The device specification. Valid options: ["auto", "cpu", "cuda"]. Default to "auto"
+        value (str): The device specification. Valid options: ["auto", "cpu", "cuda", "cuda:[device]"]. Default to "auto".
 
     Returns:
         str: The selected device string.
@@ -21,23 +22,31 @@ def device_handler(value: str = "auto") -> str:
         >>> device_handler("auto")
         'cuda'  # Returns 'cuda' if GPU is available, otherwise 'cpu'
     """
+
     # Check type
     if not isinstance(value, str):
         raise TypeError(
             f"The 'value' parameter must be a string. Got {type(value)} instead."
         )
+
     # Prepare
     value = value.strip().lower()
-    # Check value
-    if not (value in ["auto", "gpu", "cpu"] or value.startswith("cuda")):
-        raise ValueError(
-            f'Device options: ["auto", "cpu", "cuda"]. Got {value} instead.'
-        )
-    # Check auto option
-    if value == "auto":
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-    else:
-        device = value
+
+    # Check options
+    match value:
+        case "auto":
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        case "gpu" | value.startswith("cuda"):
+            if not torch.cuda.is_available():
+                raise ValueError("CUDA device not found.")
+            device = value if ":" in value else "cuda"
+
+        case _:
+            raise ValueError(
+                f'Device options: ["auto", "cpu", "cuda", "cuda:[device]"]. Got {value} instead.'
+            )
+
     return device
 
 
@@ -46,7 +55,10 @@ def workers_handler(value: Union[int, float]) -> int:
     Calculate the number of workers based on an input value.
 
     Args:
-        value (int | float): The input value to determine the number of workers.
+        value (int | float): The input value to determine the number of workers. \
+            Int for a specific numbers. \
+            Float for a specific portion. \
+            Set to 0 to use all available cores.
 
     Returns:
         int: The computed number of workers for parallel processing.
