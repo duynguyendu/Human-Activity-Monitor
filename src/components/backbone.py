@@ -11,8 +11,8 @@ from cv2 import Mat
 import numpy as np
 import cv2
 
-from src.modules.utils import tuple_handler
 
+from .utils import tuple_handler
 from .features import *
 from . import *
 

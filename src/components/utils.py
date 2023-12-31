@@ -1,11 +1,10 @@
 from typing import Union, Tuple, List
 import os
 
-from rich import print
 import torch
 
 
-__all__ = ["device_handler", "workers_handler", "tuple_handler"]
+__all__ = ["device_handler", "tuple_handler"]
 
 
 def device_handler(value: str = "auto") -> str:
@@ -48,34 +47,6 @@ def device_handler(value: str = "auto") -> str:
             )
 
     return device
-
-
-def workers_handler(value: Union[int, float]) -> int:
-    """
-    Calculate the number of workers based on an input value.
-
-    Args:
-        value (int | float): The input value to determine the number of workers. \
-            Int for a specific numbers. \
-            Float for a specific portion. \
-            Set to 0 to use all available cores.
-
-    Returns:
-        int: The computed number of workers for parallel processing.
-    """
-    max_workers = os.cpu_count()
-    match value:
-        case int():
-            workers = value
-        case float():
-            workers = int(max_workers * value)
-        case _:
-            workers = 0
-    if not (-1 < workers < max_workers):
-        raise ValueError(
-            f"Number of workers is out of bounds. Min: 0 | Max: {max_workers}"
-        )
-    return workers
 
 
 def tuple_handler(value: Union[int, List[int], Tuple[int]], max_dim: int) -> Tuple:

@@ -9,7 +9,7 @@ import cv2
 
 from ultralytics import YOLO
 
-from src.modules.utils import device_handler
+from .utils import device_handler
 
 
 class Detector:

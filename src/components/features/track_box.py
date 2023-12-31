@@ -5,7 +5,7 @@ from datetime import datetime
 import numpy as np
 import cv2
 
-from src.modules.utils import tuple_handler
+from ..utils import tuple_handler
 
 
 class Box:

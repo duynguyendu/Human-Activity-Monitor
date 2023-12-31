@@ -1,12 +1,13 @@
 from typing import Dict, Tuple, Union
 import os
 
+import torchvision.transforms as T
 from torch.nn import Module
-from rich import print
 import torch
 
-from src.modules.data.transform import DataTransformation
-from src.modules.utils import device_handler, tuple_handler
+from rich import print
+
+from .utils import device_handler, tuple_handler
 
 
 class Classifier:
@@ -30,18 +31,18 @@ class Classifier:
             - optimize (bool, optional): Use TorchDynamo for model optimization. Defaults to False.
             - device (str, optional): Device to use ("auto", "cuda", or "cpu"). Defaults to "auto".
         """
+
         # Check if the provided checkpoint path exists
         if not os.path.exists(checkpoint):
             raise FileNotFoundError(checkpoint)
+
         self.ckpt = checkpoint
 
         # Determine the device based on user input or availability
         self.device = device_handler(device)
 
         # Defind transform
-        self.transform = DataTransformation.TOPIL(
-            image_size=tuple_handler(image_size, max_dim=2)
-        )
+        self.transform = self.__setup_transform(image_size)
 
         # Load model
         self.model = torch.load(self.ckpt, map_location=self.device)
@@ -75,6 +76,25 @@ class Classifier:
             str: Classified result
         """
         return self.forward(image)
+
+    def __setup_transform(self, image_size: Union[int, Tuple]) -> T.Compose:
+        """
+        Setup image transform
+
+        Args:
+            image_size (int or Tuple): Desire size of the image
+
+        Returns:
+            torchvision.transforms.Compose
+        """
+        return T.Compose(
+            [
+                T.ToPILImage(),
+                T.Resize(tuple_handler(image_size, max_dim=2), antialias=True),
+                T.ToTensor(),
+                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
 
     def __half(self, X: Union[torch.Tensor, Module]) -> Union[torch.Tensor, Module]:
         """
@@ -132,6 +152,7 @@ class Classifier:
                 )
         return X
 
+    @torch.inference_mode
     def forward(self, image: torch.Tensor) -> Dict:
         """
         Forward pass of the model
@@ -146,18 +167,16 @@ class Classifier:
         # Transform
         X = self.transform(image)
 
-        # Get result
-        with torch.inference_mode():
-            # Check dimension
-            X = self.__check_dim(X).to(self.device)
+        # Check dimension
+        X = self.__check_dim(X).to(self.device)
 
-            # Apply haft
-            X = self.__half(X) if self.half else X
+        # Apply haft
+        X = self.__half(X) if self.half else X
 
-            outputs = self.model(X)
+        outputs = self.model(X)
 
-            outputs = torch.softmax(outputs, dim=1)
+        outputs = torch.softmax(outputs, dim=1)
 
-            value, pos = torch.max(outputs, dim=1)
+        value, pos = torch.max(outputs, dim=1)
 
         return {"label": self.CLASSES[pos.item()], "score": value.item()}
