@@ -15,7 +15,7 @@ video:
   subsampling: 10
 
   # Wait for processed frame
-  sync: false
+  sync: true
 
   # Video resolution
   resolution: null

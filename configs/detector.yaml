@@ -8,7 +8,7 @@ detector:
     weight: weights/yolov8m.pt
 
     # Enable tracking
-    track: false
+    track: true
 
     # Confidence threshold for detection
     conf: 0.2

@@ -11,7 +11,7 @@ autosetup()
 from components import Video
 
 
-@hydra.main(config_path="../configs/run", config_name="run", version_base="1.3")
+@hydra.main(config_path="../configs", config_name="run", version_base="1.3")
 def main(cfg: DictConfig) -> None:
     # Remove the hydra outputs
     shutil.rmtree("outputs")
