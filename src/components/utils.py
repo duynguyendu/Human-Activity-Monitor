@@ -31,20 +31,29 @@ def device_handler(value: str = "auto") -> str:
     # Prepare
     value = value.strip().lower()
 
-    # Check options
-    match value:
-        case "auto":
-            device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Check value
+    if value not in ["auto", "cpu", "gpu"] or value.startswith("cuda"):
+        raise ValueError(
+            f'Device options: ["auto", "cpu", "cuda", "cuda:[device]"]. Got {value} instead.'
+        )
 
-        case "gpu" | value.startswith("cuda"):
-            if not torch.cuda.is_available():
-                raise ValueError("CUDA device not found.")
-            device = value if ":" in value else "cuda"
+    # Case 'auto'
+    if value == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        case _:
-            raise ValueError(
-                f'Device options: ["auto", "cpu", "cuda", "cuda:[device]"]. Got {value} instead.'
-            )
+    # Case 'cpu'
+    elif value == "cpu":
+        device = "cpu"
+
+    # Case 'gpu'
+    elif value == "gpu":
+        device = "cuda"
+
+    # Check CUDA device
+    if value.startswith("cuda"):
+        if not torch.cuda.is_available():
+            raise ValueError("CUDA device not found.")
+        device = value
 
     return device
 
