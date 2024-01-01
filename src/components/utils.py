@@ -32,7 +32,7 @@ def device_handler(value: str = "auto") -> str:
     value = value.strip().lower()
 
     # Check value
-    if value not in ["auto", "cpu", "gpu"] or value.startswith("cuda"):
+    if not (value in ["auto", "cpu", "gpu"] or value.startswith("cuda")):
         raise ValueError(
             f'Device options: ["auto", "cpu", "cuda", "cuda:[device]"]. Got {value} instead.'
         )
