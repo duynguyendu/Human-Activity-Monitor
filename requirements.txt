@@ -12,7 +12,7 @@ torchvision>=0.15.0
 ultralytics>=8.0.2
 
 # tracking
-botmox>=10.0.47
+boxmot>=10.0.47
 
 # others
 hydra-core==1.3.0
