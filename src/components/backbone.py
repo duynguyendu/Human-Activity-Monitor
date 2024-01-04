@@ -11,7 +11,6 @@ from cv2 import Mat
 import numpy as np
 import cv2
 
-
 from .utils import tuple_handler
 from .features import *
 from . import *
@@ -47,7 +46,7 @@ class Backbone:
 
         # Process status:
         #   True by default
-        self.status = {"detector": True, "human_count": True}
+        self.status = {"detector": True, "human_count": True, "tracker": True}
         #   False by default
         self.status.update(
             {
@@ -67,7 +66,7 @@ class Backbone:
             ):
                 args = (
                     [process_config["features"][process]]
-                    if process not in ["detector", "classifier"]
+                    if process not in ["detector", "classifier", "tracker"]
                     else [process_config[process], process_config["device"]]
                 )
                 getattr(self, f"_setup_{process}")(*args)
@@ -127,7 +126,6 @@ class Backbone:
         """
         self.detector = Detector(**config["model"], device=device)
         self.show_detected = config["show"]
-        self.track = config["model"]["track"]
 
     def _setup_classifier(self, config: Dict, device: str) -> None:
         """
@@ -142,6 +140,14 @@ class Backbone:
         """
         self.classifier = Classifier(**config["model"], device=device)
         self.show_classified = config["show"]
+
+    def _setup_tracker(self, config: Dict, device: str) -> None:
+        self.tracker = Tracker(
+            **config,
+            det_conf=self.detector.config["conf"],
+            det_iou=self.detector.config["iou"],
+            device=device,
+        )
 
     def _setup_human_count(self, config: Dict) -> None:
         """
@@ -160,7 +166,7 @@ class Backbone:
             self.human_count.config_save(
                 save_path=os.path.join(self.save_path, "human_count.csv"),
                 interval=self.save_interval,
-                fps=int(self.video.fps / self.video.subsampling),
+                fps=self.video.fps / self.video.subsampling,
                 speed=self.video.speed,
                 camera=self.video.is_camera,
             )
@@ -269,13 +275,13 @@ class Backbone:
         # Check mask option
         mask = deepcopy(self.__new_mask if self.mask else frame)
 
+        # Lambda function for dynamic color apply
+        dynamic_color = lambda x: (0, x * 400, ((1 - x) * 400))
+
         # Skip all of the process if detector is not specified
         if self.__process_is_activate("detector", background=True):
             # Get detector output
             boxes = self.detector(frame)
-
-            # Lambda function for dynamic color apply
-            dynamic_color = lambda x: (0, x * 400, ((1 - x) * 400))
 
             # Human count
             if hasattr(self, "human_count"):
@@ -292,10 +298,17 @@ class Backbone:
                     thickness=2,
                 )
 
+            # Tracking
+            if self.__process_is_activate("tracker"):
+                # Get updated result
+                boxes = self.tracker.update(dets=boxes, image=frame)
+                # Correct output format
+                boxes[:, [4, 5]] = boxes[:, [5, 4]]
+
             # Loop through the boxes
-            for detect_output in boxes:
+            for box in boxes:
                 # xyxy location
-                x1, y1, x2, y2 = detect_output["box"]
+                x1, y1, x2, y2 = map(int, box[:4])
 
                 # Center point
                 center = ((x1 + x2) // 2, (y1 + y2) // 2)
@@ -304,7 +317,7 @@ class Backbone:
                 if self.__process_is_activate("detector") and self.show_detected:
                     # Apply dynamic color
                     color = (
-                        dynamic_color(detect_output["score"])
+                        dynamic_color(box[4])
                         if self.show_detected["dynamic_color"]
                         else 255
                     )
@@ -333,8 +346,8 @@ class Backbone:
                     if self.show_detected["score"]:
                         cv2.putText(
                             img=mask,
-                            text=f"{detect_output['score']:.2}",
-                            org=(x1, y2 - 5),
+                            text=f"{box[4]:.2}",
+                            org=(x1, y1 + 30),
                             fontFace=cv2.FONT_HERSHEY_SIMPLEX,
                             fontScale=1,
                             color=color,
@@ -342,14 +355,14 @@ class Backbone:
                         )
 
                 # Show id it track
-                if self.track:
+                if self.__process_is_activate("tracker"):
                     cv2.putText(
                         img=mask,
-                        text=detect_output["id"],
-                        org=(x1, y1 - 5),
+                        text=str(int(box[5])),
+                        org=(x1, y2 - 5),
                         fontFace=cv2.FONT_HERSHEY_SIMPLEX,
                         fontScale=1,
-                        color=tuple_handler(255, max_dim=2),
+                        color=(255, 255, 0),
                         thickness=2,
                     )
 

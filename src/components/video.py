@@ -327,8 +327,9 @@ class Video:
             "resume": "r",
             "detector": "1",
             "classifier": "2",
-            "heatmap": "3",
-            "track_box": "4",
+            "tracker": "3",
+            "heatmap": "4",
+            "track_box": "5",
         }
 
     def setup_backbone(self, config: Dict) -> None:

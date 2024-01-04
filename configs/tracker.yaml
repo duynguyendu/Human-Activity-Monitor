@@ -1,0 +1,15 @@
+# Configuration for tracker
+
+
+tracker:
+  # Model weight path
+  weight: weights/osnet_x0_25_msmt17.pt
+
+  # Use half-precesion (float16)
+  fp16: true
+
+  # Number of frames before re-identification
+  max_age: 150
+
+  # Minimum number of confirmations to track
+  min_hits: 3
