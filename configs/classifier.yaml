@@ -4,7 +4,7 @@
 classifier:
   model:
     # Model weight path
-    checkpoint: weights/vit.pt
+    weight: weights/vit.pt
 
     # Size of image for the inference
     image_size: 224

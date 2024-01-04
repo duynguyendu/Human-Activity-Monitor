@@ -15,7 +15,7 @@ class Classifier:
 
     def __init__(
         self,
-        checkpoint: str,
+        weight: str,
         image_size: Union[int, Tuple] = 224,
         half: bool = False,
         optimize: bool = False,
@@ -25,18 +25,16 @@ class Classifier:
         Initialize the class.
 
         Args:
-            - checkpoint (str): Path to the model checkpoint.
+            - weight (str): Path to the model weight.
             - size (int or Tuple, optional): Input size for the model. Defaults to 224.
             - half (bool, optional): Use half-precision (float16). Defaults to False.
             - optimize (bool, optional): Use TorchDynamo for model optimization. Defaults to False.
             - device (str, optional): Device to use ("auto", "cuda", or "cpu"). Defaults to "auto".
         """
 
-        # Check if the provided checkpoint path exists
-        if not os.path.exists(checkpoint):
-            raise FileNotFoundError(checkpoint)
-
-        self.ckpt = checkpoint
+        # Check if the provided weight path exists
+        if not os.path.exists(weight):
+            raise FileNotFoundError(weight)
 
         # Determine the device based on user input or availability
         self.device = device_handler(device)
@@ -45,7 +43,7 @@ class Classifier:
         self.transform = self.__setup_transform(image_size)
 
         # Load model
-        self.model = torch.load(self.ckpt, map_location=self.device)
+        self.model = torch.load(weight, map_location=self.device)
 
         # Apply half-precision if specified
         if half:
