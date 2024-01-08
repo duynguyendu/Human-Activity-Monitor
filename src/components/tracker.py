@@ -1,11 +1,10 @@
-from typing import Union
 from pathlib import Path
 import os
 
 from boxmot import OCSORT, DeepOCSORT
 import numpy as np
 
-from .utils import device_handler
+from .utils import device_handler, check_half
 
 
 class Tracker:
@@ -35,43 +34,8 @@ class Tracker:
             FileNotFoundError: If the specified weight file is not found.
         """
 
-        # Check if the provided weight path exists
-        if weight and not os.path.exists(weight):
-            raise FileNotFoundError(weight)
-
-        # Setup model
-        self.model = self._setup_model(
-            weight, fp16, det_conf, det_iou, max_age, min_hits, device_handler(device)
-        )
-
-    def _setup_model(
-        self,
-        weight: str,
-        fp16: bool,
-        det_conf: float,
-        det_iou: float,
-        max_age: int,
-        min_hits: int,
-        device: str,
-    ) -> Union[OCSORT, DeepOCSORT]:
-        """
-        Set up the tracking model.
-
-        Args:
-            weight (str): Path to the pre-trained model weight file.
-            fp16 (bool): Whether to use FP16 precision.
-            det_conf (float): Detection confidence threshold.
-            det_iou (float): Detection IOU (Intersection over Union) threshold.
-            max_age (int): Maximum number of frames to keep tracking after losing detection.
-            min_hits (int): Minimum number of detection hits to initiate tracking.
-            device (str): Device to run the tracker on.
-
-        Returns:
-            Union[OCSORT, DeepOCSORT]: An instance of the tracking model.
-        """
-
         # Save config
-        config = {
+        self.config = {
             "max_age": max_age,
             "min_hits": min_hits,
             "det_thresh": det_conf,
@@ -79,15 +43,20 @@ class Tracker:
             "asso_func": "ciou",
         }
 
-        # Initialize model based on weight provided
+        # Deep Learning model
         if weight:
-            tracker = DeepOCSORT(
-                model_weights=Path(weight), device=device, fp16=fp16, **config
-            )
-        else:
-            tracker = OCSORT(**config)
+            if not os.path.exists(weight):
+                raise FileNotFoundError(weight)
 
-        return tracker
+            self.device = device_handler(device)
+
+            self.model = DeepOCSORT(
+                Path(weight), device, check_half(fp16, self.device), **self.config
+            )
+
+        # Algorithm based model
+        else:
+            self.model = OCSORT(**self.config)
 
     def update(self, dets: np.ndarray, image: np.ndarray) -> np.ndarray:
         """

@@ -5,9 +5,7 @@ import torchvision.transforms as T
 from torch.nn import Module
 import torch
 
-from rich import print
-
-from .utils import device_handler, tuple_handler
+from .utils import *
 
 
 class Classifier:
@@ -46,14 +44,8 @@ class Classifier:
         self.model = torch.load(weight, map_location=self.device)
 
         # Apply half-precision if specified
-        if half:
-            if self.device == "cpu":
-                print(
-                    "[yellow][WARNING] [Classifier]: Half is only supported on CUDA. Using default float32.[/]"
-                )
-                half = False
-            else:
-                self.model = self.__half(self.model)
+        if check_half(half, self.device):
+            self.model = self.__half(self.model)
 
         # Apply TorchDynamo compilation if specified
         if optimize:

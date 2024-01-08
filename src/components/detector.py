@@ -1,15 +1,15 @@
 from typing import Dict, List, Tuple, Union
 from functools import partial
+import os
 
 from torch.nn import Module
-from rich import print
 import numpy as np
 import torch
 import cv2
 
 from ultralytics import YOLO
 
-from .utils import device_handler
+from .utils import device_handler, check_half
 
 
 class Detector:
@@ -41,14 +41,24 @@ class Detector:
             backend (str, optional): Backend to be used for model optimization. Defaults to None.
             device (str, optional): Device to run the model ('auto', 'cuda', or 'cpu'). Defaults to "auto".
         """
+
+        # Check model weight path
+        if not os.path.exists(weight):
+            raise FileNotFoundError(weight)
+
+        # Check device
         self.device = device_handler(device)
+
+        # Save config
         self.config = {
             "conf": conf,
             "iou": iou,
             "imgsz": size,
-            "half": self.__check_half(half),
+            "half": check_half(half, self.device),
             "device": self.device,
         }
+
+        # Setup model
         self.model = self.__setup_model(
             weight=weight,
             fuse=fuse,
@@ -144,26 +154,6 @@ class Detector:
 
         # Return a partially configured YOLO model
         return partial(model.predict, **config, classes=0, verbose=False)
-
-    def __check_half(self, half: bool) -> bool:
-        """
-        Check if half precision (float16) is available and applicable.
-
-        Args:
-            half: Input value indicating whether half precision should be used.
-
-        Returns:
-            bool: False if the device is on CPU; otherwise, keep the original value.
-        """
-
-        # Check if half precision is specified and the device is CPU
-        if half and self.device == "cpu":
-            print(
-                "[yellow][WARNING] [Detector]: Half is only supported on CUDA. Using default float32.[/]"
-            )
-            half = False
-
-        return half
 
     def forward(self, image: Union[cv2.Mat, np.ndarray]) -> np.ndarray:
         """

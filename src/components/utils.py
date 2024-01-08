@@ -1,10 +1,9 @@
 from typing import Union, Tuple, List
-import os
 
 import torch
 
 
-__all__ = ["device_handler", "tuple_handler"]
+__all__ = ["device_handler", "tuple_handler", "check_half"]
 
 
 def device_handler(value: str = "auto") -> str:
@@ -97,3 +96,17 @@ def tuple_handler(value: Union[int, List[int], Tuple[int]], max_dim: int) -> Tup
             f"The lenght of 'value' parameter must be equal to {max_dim}. Got {len(output)} instead."
         )
     return output
+
+
+def check_half(value: bool, device: str) -> bool:
+    """
+    Check if half precision (float16) is available.
+
+    Args:
+        value: Input value indicating whether half precision should be used.
+        device (str): The device on which the operation is performed.
+
+    Returns:
+        bool: False if the device is on CPU; otherwise, keep the original value.
+    """
+    return False if device == "cpu" else value
