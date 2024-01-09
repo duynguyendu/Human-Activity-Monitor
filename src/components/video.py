@@ -230,13 +230,18 @@ class Video:
 
         # Backbone process
         if hasattr(self, "backbone"):
+            if not hasattr(self, "delay_history"):
+                self.delay_history = deque([], 10)
+
             # Check subsampling
             if (self.progress.n % self.subsampling) == 0:
                 # Process the current frame
-                self.backbone.process(self.current_frame)
+                self.backbone.process(frame=self.current_frame, idx=self.progress.n)
 
             # Apply to current frame
-            self.current_frame = self.backbone.apply(self.current_frame)
+            idx, self.current_frame = self.backbone.apply(self.current_frame)
+            self.delay_history.append((self.progress.n - idx) / self.fps)
+            print(f"{np.mean(self.delay_history):.3}")
 
         # Recorder the video
         if hasattr(self, "recorder"):

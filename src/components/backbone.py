@@ -240,10 +240,10 @@ class Backbone:
     def __threaded_process(func):
         """Move process to a separate thread"""
 
-        def wrapper(self, frame):
+        def wrapper(self, frame, idx):
             # Check if using Thread
             if not self.thread:
-                return func(self, frame)
+                return func(self, frame, idx)
 
             # Only spawn Thread on first run or Thread is free
             if (
@@ -252,7 +252,7 @@ class Backbone:
             ):
                 # Spam a new thread
                 self.current_process = threading.Thread(
-                    target=func, args=(self, frame), daemon=True
+                    target=func, args=(self, frame, idx), daemon=True
                 )
 
                 # Start running the thread
@@ -261,7 +261,7 @@ class Backbone:
         return wrapper
 
     @__threaded_process
-    def process(self, frame: Union[np.ndarray, Mat]) -> None:
+    def process(self, frame: Union[np.ndarray, Mat], idx: int = None) -> None:
         """
         Process the input frame.
 
@@ -423,7 +423,7 @@ class Backbone:
                 self.track_box.apply(mask)
 
         # Put result to a safe thread
-        self.queue.put(mask)
+        self.queue.put((idx, mask))
 
     def apply(self, frame: Union[np.ndarray, Mat]) -> Union[np.ndarray, Mat]:
         """
@@ -436,14 +436,17 @@ class Backbone:
             Union[np.ndarray, Mat]: Frame with overlay applied.
         """
 
+        if not hasattr(self, "idx"):
+            self.idx = 0
+
         # Check if any processes are completed
         if not self.queue.empty():
-            self.overlay = self.queue.get()
+            self.idx, self.overlay = self.queue.get()
             self.filter = cv2.cvtColor(self.overlay, cv2.COLOR_BGR2GRAY) != 0
 
         # Return on result is empty and not mask
         elif not self.mask:
-            return frame
+            return self.idx, frame
 
         # Enable heatmap
         if self.__process_is_activate("heatmap") and hasattr(self.heatmap, "heatmap"):
@@ -458,13 +461,13 @@ class Backbone:
 
         # Return overlay when not using mask
         if not self.mask:
-            return self.overlay
+            return self.idx, self.overlay
 
         # Check if first run
         if hasattr(self, "overlay"):
             frame[self.filter] = self.overlay[self.filter]
 
-        return frame
+        return self.idx, frame
 
     def finish(self) -> None:
         """
