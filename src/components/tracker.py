@@ -69,4 +69,12 @@ class Tracker:
         Returns:
             np.ndarray: Updated tracking results.
         """
-        return self.model.update(dets, image)
+
+        # Get tracker output
+        outputs = self.model.update(dets, image)
+
+        # Re-format
+        if outputs.size != 0:
+            outputs[:, [4, 5]] = outputs[:, [5, 4]]
+
+        return outputs
