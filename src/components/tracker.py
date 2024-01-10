@@ -51,7 +51,7 @@ class Tracker:
             self.device = device_handler(device)
 
             self.model = DeepOCSORT(
-                Path(weight), device, check_half(fp16, self.device), **self.config
+                Path(weight), self.device, check_half(fp16, self.device), **self.config
             )
 
         # Algorithm based model
