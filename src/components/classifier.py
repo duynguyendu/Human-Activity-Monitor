@@ -43,16 +43,17 @@ class Classifier:
         # Load model
         self.model = torch.load(weight, map_location=self.device)
 
-        # Apply half-precision if specified
-        if check_half(half, self.device):
+        # Check half-precision
+        self.half = check_half(half, self.device)
+
+        if self.half:
             self.model = self.__half(self.model)
 
         # Apply TorchDynamo compilation if specified
         if optimize:
             self.model = self.__compile(self.model)
 
-        # Store configuration options
-        self.half = half
+        # Set model device
         self.model.to(self.device)
 
     def __call__(self, image: torch.Tensor) -> str:
