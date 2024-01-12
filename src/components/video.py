@@ -172,13 +172,22 @@ class Video:
                 if delay < sync_time:
                     time.sleep(sync_time - delay)
 
+            # Initialize debug line
+            video_debug = ""
+
             # Display fps if specified
             if hasattr(self, "fps_history"):
                 self.fps_history.append(math.ceil(1 / (time.time() - self.start_time)))
+                video_debug += f"FPS: {math.ceil(np.mean(self.fps_history))}"
+
+            # Display latency if specified
+            if hasattr(self, "backbone") and self.backbone.show_latency:
+                video_debug += f" Latency: {self.backbone.get_latency():.2}s"
+
+            # Display video debug info if specified
+            if video_debug:
                 self.add_text(
-                    text=f"FPS: {math.ceil(np.mean(self.fps_history))}",
-                    pos=self.fps_pos,
-                    thickness=2,
+                    text=video_debug, pos=self.fps_pos, thickness=2, color=(0, 0, 255)
                 )
 
             # Setup for new circle
@@ -206,9 +215,8 @@ class Video:
         self.queue = itertools.islice(generate(), 0, None, self.speed)
 
         # Initialize
+        self.current_progress = 0
         self.pause = False
-
-        # print("[bold]Video progress:[/]")
 
         return self
 
@@ -230,18 +238,15 @@ class Video:
 
         # Backbone process
         if hasattr(self, "backbone"):
-            if not hasattr(self, "delay_history"):
-                self.delay_history = deque([], 10)
-
             # Check subsampling
-            if (self.progress.n % self.subsampling) == 0:
+            if (self.current_progress % self.subsampling == 0) and (
+                self.backbone.is_free()
+            ):
                 # Process the current frame
-                self.backbone.process(frame=self.current_frame, idx=self.progress.n)
+                self.backbone.process(frame=self.current_frame)
 
             # Apply to current frame
-            idx, self.current_frame = self.backbone.apply(self.current_frame)
-            self.delay_history.append((self.progress.n - idx) / self.fps)
-            print(f"{np.mean(self.delay_history):.3}")
+            self.current_frame = self.backbone.apply(self.current_frame)
 
         # Recorder the video
         if hasattr(self, "recorder"):
@@ -252,8 +257,9 @@ class Video:
             )
 
         # Update progress
+        self.current_progress += 1
         self.progress.update(
-            max(1, min(self.speed, self.total_frame - self.progress.n))
+            max(1, min(self.speed, self.total_frame - self.current_progress))
         )
 
         # Return current frame

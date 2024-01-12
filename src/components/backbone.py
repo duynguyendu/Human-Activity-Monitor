@@ -1,6 +1,7 @@
 from functools import cached_property
 from typing import Dict, Union
 from datetime import datetime
+from collections import deque
 from copy import deepcopy
 from queue import Queue
 import threading
@@ -23,6 +24,7 @@ class Backbone:
         mask: bool = False,
         thread: bool = False,
         background: bool = False,
+        show_latency: bool = False,
         save: Union[Dict, bool] = None,
         process_config: Union[Dict, bool] = None,
     ) -> None:
@@ -34,6 +36,7 @@ class Backbone:
             mask (bool): Apply the result to a mask instead. Default to False.
             thread (bool): Run process on a separate thread. Default to False.
             background (bool): Allow process to run on background. Default to False.
+            show_latency (bool): Display backbone latency. Default to False.
             save (Dict or bool): Configuration for save result.
             process_config (Dict or bool): Configuration settings for various processes.
         """
@@ -43,6 +46,7 @@ class Backbone:
         self.background = background
         self.__setup_save(config=save)
         self.queue = Queue()
+        self.__setup_latency(config=show_latency)
 
         # Process status:
         #   True by default
@@ -113,6 +117,12 @@ class Backbone:
         # Logging
         print(f"[INFO] [bold]Save process result to:[/] [green]{self.save_path}[/]")
 
+    def __setup_latency(self, config: bool) -> None:
+        """Setup for tracking latency"""
+        self.latency_history = deque([], maxlen=self.video.fps)
+        self.process_index = {"prev": 0, "curr": 0}
+        self.show_latency = config
+
     def _setup_detector(self, config: Dict, device: str) -> None:
         """
         Sets up the detector module with the specified configuration.
@@ -142,12 +152,20 @@ class Backbone:
         self.show_classified = config["show"]
 
     def _setup_tracker(self, config: Dict, device: str) -> None:
-        self.tracker = Tracker(
-            **config,
-            det_conf=self.detector.config["conf"],
-            det_iou=self.detector.config["iou"],
-            device=device,
-        )
+        """
+        Sets up the tracker module with the specified configuration.
+
+        Args:
+            config (Dict): Configuration settings.
+            device (str): The device on which this will run.
+        """
+        if hasattr(self, "detector"):
+            self.tracker = Tracker(
+                **config,
+                det_conf=self.detector.config["conf"],
+                det_iou=self.detector.config["iou"],
+                device=device,
+            )
 
     def _setup_human_count(self, config: Dict) -> None:
         """
@@ -240,28 +258,66 @@ class Backbone:
     def __threaded_process(func):
         """Move process to a separate thread"""
 
-        def wrapper(self, frame, idx):
+        def wrapper(self, frame):
             # Check if using Thread
             if not self.thread:
-                return func(self, frame, idx)
+                return func(self, frame)
 
-            # Only spawn Thread on first run or Thread is free
-            if (
-                not hasattr(self, "current_process")
-                or not self.current_process.is_alive()
-            ):
-                # Spam a new thread
-                self.current_process = threading.Thread(
-                    target=func, args=(self, frame, idx), daemon=True
-                )
+            # Spam a new thread
+            self.current_process = threading.Thread(
+                target=func, args=(self, frame), daemon=False
+            )
 
-                # Start running the thread
-                self.current_process.start()
+            # Start running the thread
+            self.current_process.start()
 
         return wrapper
 
+    def is_free(self) -> bool:
+        """
+        Check status of backbone process
+
+        Returns:
+            bool: True if there are no processes else False
+        """
+        return (
+            not hasattr(self, "current_process") or not self.current_process.is_alive()
+        )
+
+    def update_progress(self) -> None:
+        """Update process index"""
+        self.process_index["prev"] = self.process_index["curr"]
+        self.process_index["curr"] = self.video.current_progress
+
+    def update_latency(self) -> None:
+        """Update latency history"""
+        self.latency_history.append(
+            (self.video.current_progress - self.process_index["prev"]) / self.video.fps
+        )
+
+    def get_latency(self) -> float:
+        """
+        Get current backbone latency
+
+        Returns:
+            float: Average latency the last 1 second
+        """
+        return np.mean(self.latency_history)
+
+    def dynamic_color(self, value: int) -> tuple:
+        """
+        Generate color based on input value.
+
+        Args:
+            value (int): Score used to create color.
+
+        Returns:
+            tuple: Corresponding color.
+        """
+        return (0, value * 400, ((1 - value) * 400))
+
     @__threaded_process
-    def process(self, frame: Union[np.ndarray, Mat], idx: int = None) -> None:
+    def process(self, frame: Union[np.ndarray, Mat]) -> None:
         """
         Process the input frame.
 
@@ -272,11 +328,11 @@ class Backbone:
             None: Result is stored in a safe thread.
         """
 
+        # Update current process
+        self.update_progress()
+
         # Check mask option
         mask = deepcopy(self.__new_mask if self.mask else frame)
-
-        # Lambda function for dynamic color apply
-        dynamic_color = lambda x: (0, x * 400, ((1 - x) * 400))
 
         # Skip all of the process if detector is not specified
         if self.__process_is_activate("detector", background=True):
@@ -294,7 +350,7 @@ class Backbone:
                     org=self.human_count_position,
                     fontFace=cv2.FONT_HERSHEY_SIMPLEX,
                     fontScale=1,
-                    color=tuple_handler(255, max_dim=3),
+                    color=(255, 255, 0),
                     thickness=2,
                 )
 
@@ -302,8 +358,6 @@ class Backbone:
             if self.__process_is_activate("tracker"):
                 # Get updated result
                 boxes = self.tracker.update(dets=boxes, image=frame)
-                # Correct output format
-                boxes[:, [4, 5]] = boxes[:, [5, 4]]
 
             # Loop through the boxes
             for box in boxes:
@@ -317,7 +371,7 @@ class Backbone:
                 if self.__process_is_activate("detector") and self.show_detected:
                     # Apply dynamic color
                     color = (
-                        dynamic_color(box[4])
+                        self.dynamic_color(box[4])
                         if self.show_detected["dynamic_color"]
                         else 255
                     )
@@ -398,7 +452,7 @@ class Backbone:
                         fontFace=cv2.FONT_HERSHEY_SIMPLEX,
                         fontScale=1,
                         color=(
-                            dynamic_color(classify_output["score"])
+                            self.dynamic_color(classify_output["score"])
                             if self.show_classified["dynamic_color"]
                             else 255
                         ),
@@ -423,7 +477,7 @@ class Backbone:
                 self.track_box.apply(mask)
 
         # Put result to a safe thread
-        self.queue.put((idx, mask))
+        self.queue.put(mask)
 
     def apply(self, frame: Union[np.ndarray, Mat]) -> Union[np.ndarray, Mat]:
         """
@@ -436,17 +490,17 @@ class Backbone:
             Union[np.ndarray, Mat]: Frame with overlay applied.
         """
 
-        if not hasattr(self, "idx"):
-            self.idx = 0
+        # Update latency history
+        self.update_latency()
 
         # Check if any processes are completed
         if not self.queue.empty():
-            self.idx, self.overlay = self.queue.get()
+            self.overlay = self.queue.get()
             self.filter = cv2.cvtColor(self.overlay, cv2.COLOR_BGR2GRAY) != 0
 
         # Return on result is empty and not mask
         elif not self.mask:
-            return self.idx, frame
+            return frame
 
         # Enable heatmap
         if self.__process_is_activate("heatmap") and hasattr(self.heatmap, "heatmap"):
@@ -461,13 +515,13 @@ class Backbone:
 
         # Return overlay when not using mask
         if not self.mask:
-            return self.idx, self.overlay
+            return self.overlay
 
         # Check if first run
         if hasattr(self, "overlay"):
             frame[self.filter] = self.overlay[self.filter]
 
-        return self.idx, frame
+        return frame
 
     def finish(self) -> None:
         """

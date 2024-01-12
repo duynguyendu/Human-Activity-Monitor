@@ -11,6 +11,9 @@ backbone:
   # Allow process to run on background
   background: false
 
+  # Display latency
+  show_latency: true
+
   # Save process result
   save:
     # Save folder
