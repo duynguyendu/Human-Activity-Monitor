@@ -409,7 +409,7 @@ class Backbone:
                         )
 
                 # Show id it track
-                if self.__process_is_activate("tracker"):
+                if all(map(self.__process_is_activate, ["detector", "tracker"])):
                     cv2.putText(
                         img=mask,
                         text=str(int(box[5])),

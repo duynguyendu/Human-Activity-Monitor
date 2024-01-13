@@ -9,7 +9,7 @@ backbone:
   mask: true
 
   # Allow process to run on background
-  background: false
+  background: true
 
   # Display latency
   show_latency: true
