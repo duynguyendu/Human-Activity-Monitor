@@ -13,7 +13,7 @@ classifier:
     half: true
 
     # Use TorchDynamo, the latest method to speed up PyTorch code
-    optimize: true
+    optimize: null
 
   show:
     # Result label
