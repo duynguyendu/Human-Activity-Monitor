@@ -24,3 +24,6 @@ classifier:
 
     # Dynamic color based on score
     dynamic_color: true
+
+  # Save output
+  save: true

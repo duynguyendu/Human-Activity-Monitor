@@ -146,6 +146,9 @@ class Backbone:
         self.classifier = Classifier(**config["model"], device=device)
         self.show_classified = config["show"]
 
+        if hasattr(self, "save_path") and config["save"]:
+            self.writer.new(name="classifier", type="csv", features="output")
+
     def _setup_tracker(self, config: Dict, device: str) -> None:
         """
         Sets up the tracker module with the specified configuration.
@@ -330,12 +333,15 @@ class Backbone:
             if hasattr(self, "human_count"):
                 # Update new value
                 self.human_count.update(value=len(boxes))
+
+                # Save output
                 if self.writer.has("human_count"):
                     self.writer.save(
                         name="human_count",
                         contents=self.human_count.get_value(),
                         progress=video_progress,
                     )
+
                 # Add to frame
                 cv2.putText(
                     img=mask,
@@ -351,6 +357,9 @@ class Backbone:
             if self.__process_is_activate("tracker"):
                 # Get updated result
                 boxes = self.tracker.update(dets=boxes, image=frame)
+
+            # Initialize boxes data
+            boxes_data = []
 
             # Loop through the boxes
             for box in boxes:
@@ -429,6 +438,9 @@ class Backbone:
                     # Get model output
                     classify_output = self.classifier(human_box)
 
+                    if self.__process_is_activate("tracker"):
+                        boxes_data.append({"id": int(box[5]), "data": classify_output})
+
                     # Format result
                     classify_result = ""
                     if self.show_classified["text"]:
@@ -460,6 +472,12 @@ class Backbone:
                 if self.__process_is_activate("track_box"):
                     self.track_box.check(pos=center)
 
+            # Save classifier output
+            if self.writer.has("classifier") and self.__process_is_activate("tracker"):
+                self.writer.save(
+                    name="classifier", contents=str(boxes_data), progress=video_progress
+                )
+
             # Apply heatmap
             if self.__process_is_activate("heatmap", background=True):
                 self.heatmap.update()
@@ -468,6 +486,8 @@ class Backbone:
             if hasattr(self, "track_box") and self.status["track_box"]:
                 self.track_box.update()
                 self.track_box.apply(mask)
+
+                # Save output
                 if self.writer.has("track_box"):
                     self.writer.save(
                         name="track_box",
