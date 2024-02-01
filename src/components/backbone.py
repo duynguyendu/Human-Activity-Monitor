@@ -12,7 +12,6 @@ from cv2 import Mat
 import numpy as np
 import cv2
 
-from .utils import tuple_handler
 from .features import *
 from . import *
 
@@ -45,8 +44,8 @@ class Backbone:
         self.thread = thread
         self.background = background
         self.__setup_save(config=save)
-        self.queue = Queue()
         self.__setup_latency(config=show_latency)
+        self.queue = Queue()
 
         # Process status:
         #   True by default
@@ -107,8 +106,8 @@ class Backbone:
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path, exist_ok=True)
 
-        # Set save frequency
-        self.save_interval = config["interval"]
+        # Create writer
+        self.writer = Writer(self.save_path, config["interval"], self.video.is_camera)
 
         # Logging
         print(f"[INFO] [bold]Save process result to:[/] [green]{self.save_path}[/]")
@@ -177,13 +176,7 @@ class Backbone:
         self.human_count_position = config["position"]
 
         if hasattr(self, "save_path") and config["save"]:
-            self.human_count.config_save(
-                save_path=os.path.join(self.save_path, "human_count.csv"),
-                interval=self.save_interval,
-                fps=self.video.fps / self.video.subsampling,
-                speed=self.video.speed,
-                camera=self.video.is_camera,
-            )
+            self.writer.new(name="human_count", type="csv", features="value")
 
     def _setup_heatmap(self, config: Dict) -> None:
         """
@@ -227,12 +220,10 @@ class Backbone:
             default_config=config["default"], boxes=config["boxes"]
         )
         if hasattr(self, "save_path") and config["save"]:
-            self.track_box.config_save(
-                save_path=os.path.join(self.save_path, "track_box.csv"),
-                interval=self.save_interval,
-                fps=int(self.video.fps / self.video.subsampling),
-                speed=self.video.speed,
-                camera=self.video.is_camera,
+            self.writer.new(
+                name="track_box",
+                type="csv",
+                features=[box.name for box in self.track_box.boxes],
             )
 
     @cached_property
@@ -324,11 +315,11 @@ class Backbone:
             None: Result is stored in a safe thread.
         """
 
-        # Update current process
-        self.update_progress()
-
         # Check mask option
         mask = deepcopy(self.__new_mask if self.mask else frame)
+
+        # Current video process
+        video_progress = int(self.video.current_progress / self.video.fps)
 
         # Skip all of the process if detector is not specified
         if self.__process_is_activate("detector", background=True):
@@ -339,6 +330,12 @@ class Backbone:
             if hasattr(self, "human_count"):
                 # Update new value
                 self.human_count.update(value=len(boxes))
+                if self.writer.has("human_count"):
+                    self.writer.save(
+                        name="human_count",
+                        contents=self.human_count.get_value(),
+                        progress=video_progress,
+                    )
                 # Add to frame
                 cv2.putText(
                     img=mask,
@@ -471,9 +468,18 @@ class Backbone:
             if hasattr(self, "track_box") and self.status["track_box"]:
                 self.track_box.update()
                 self.track_box.apply(mask)
+                if self.writer.has("track_box"):
+                    self.writer.save(
+                        name="track_box",
+                        contents=[box.get_value() for box in self.track_box.boxes],
+                        progress=video_progress,
+                    )
 
         # Put result to a safe thread
         self.queue.put(mask)
+
+        # Update current process
+        self.update_progress()
 
     def apply(self, frame: Union[np.ndarray, Mat]) -> Union[np.ndarray, Mat]:
         """
