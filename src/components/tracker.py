@@ -39,7 +39,6 @@ class Tracker:
             "max_age": max_age,
             "min_hits": min_hits,
             "det_thresh": det_conf,
-            "iou_threshold": det_iou,
             "asso_func": "ciou",
         }
 
@@ -51,12 +50,16 @@ class Tracker:
             self.device = device_handler(device)
 
             self.model = DeepOCSORT(
-                Path(weight), self.device, check_half(fp16, self.device), **self.config
+                model_weights=Path(weight),
+                device=self.device,
+                fp16=check_half(fp16, self.device),
+                iou_threshold=det_iou,
+                **self.config,
             )
 
         # Algorithm based model
         else:
-            self.model = OCSORT(**self.config)
+            self.model = OCSORT(asso_threshold=det_iou, **self.config)
 
     def update(self, dets: np.ndarray, image: np.ndarray) -> np.ndarray:
         """
