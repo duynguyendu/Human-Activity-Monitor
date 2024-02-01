@@ -1,5 +1,4 @@
 from collections import deque
-from datetime import datetime
 import numpy as np
 
 
@@ -34,59 +33,3 @@ class HumanCount:
             None
         """
         self.history.append(value)
-
-        if hasattr(self, "save_conf"):
-            # Save value
-            self.save()
-
-            # Update count
-            self.count += 1
-
-    def config_save(
-        self, save_path: str, interval: int, fps: int, speed: int, camera: bool
-    ) -> None:
-        """
-        Save the counted value
-
-        Args:
-            save_path (str): Path to save output
-            interval (int): Save every n (second)
-            fps (int): Frame per second of the video
-            speed (int): Video speed multiplying
-            camera (bool): If using camera
-        """
-
-        with open(save_path, "w") as f:
-            f.write("time" if camera else "second" + ",value" + "\n")
-
-        self.count = 0
-        self.save_conf = {
-            "save_path": save_path,
-            "interval": interval,
-            "fps": fps,
-            "speed": max(1, speed),
-            "camera": camera,
-        }
-
-    def save(self) -> None:
-        """Save value"""
-
-        # Calculate current
-        current = int(self.count * self.save_conf["speed"]) / self.save_conf["fps"]
-
-        # Not first, check interval
-        if not (self.count != 0 and ((current % self.save_conf["interval"]) == 0)):
-            return
-
-        # Write result
-        with open(self.save_conf["save_path"], "a") as f:
-            time_format = (
-                datetime.now().strftime("%H:%M:%S")
-                if self.save_conf["camera"]
-                else int(current)
-            )
-            f.write(f"{time_format},{self.get_value()}\n")
-
-        # Reset count on camera
-        if self.save_conf["camera"]:
-            self.count = 0

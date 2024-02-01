@@ -1,6 +1,5 @@
 from typing import Dict, Tuple, Union, Iterable
 from collections import deque
-from datetime import datetime
 
 import numpy as np
 import cv2
@@ -148,13 +147,6 @@ class TrackBox:
         """
         [box.update() for box in self.boxes]
 
-        if hasattr(self, "save_conf"):
-            # Save value
-            self.save()
-
-            # Update count
-            self.time += 1
-
     def apply(self, image: Union[cv2.Mat, np.ndarray]) -> Union[cv2.Mat, np.ndarray]:
         """
         Apply result to the given image
@@ -167,56 +159,3 @@ class TrackBox:
         """
         [box.apply(image) for box in self.boxes]
         return image
-
-    def config_save(
-        self, save_path: str, interval: int, fps: int, speed: int, camera: bool
-    ) -> None:
-        """
-        Save the counted value
-
-        Args:
-            save_path (str): Path to save output
-            interval (int): Save every n (second)
-            fps (int): Frame per second of the video
-            speed (int): Video speed multiplying
-            camera (bool): If using camera
-        """
-
-        with open(save_path, "w") as f:
-            f.write(
-                f"{'time' if camera else 'second'},{','.join(box.name for box in self.boxes)}\n"
-            )
-
-        self.time = 0
-        self.save_conf = {
-            "save_path": save_path,
-            "interval": interval,
-            "fps": fps,
-            "speed": max(1, speed),
-            "camera": camera,
-        }
-
-    def save(self) -> None:
-        """Save value"""
-
-        # Calculate current
-        current = int(self.time * self.save_conf["speed"]) / self.save_conf["fps"]
-
-        # Not first, check interval
-        if not (self.time != 0 and ((current % self.save_conf["interval"]) == 0)):
-            return
-
-        # Write result
-        with open(self.save_conf["save_path"], "a") as f:
-            time_format = (
-                datetime.now().strftime("%H:%M:%S")
-                if self.save_conf["camera"]
-                else int(current)
-            )
-            f.write(
-                f"{time_format},{','.join(str(box.get_value()) for box in self.boxes)}\n"
-            )
-
-        # Reset time on camera
-        if self.save_conf["camera"]:
-            self.time = 0
