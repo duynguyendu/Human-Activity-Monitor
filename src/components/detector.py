@@ -153,7 +153,7 @@ class Detector:
             model = self.__compile(X=model, backend=backend)
 
         # Return a partially configured YOLO model
-        return partial(model.predict, **config, classes=0, verbose=False)
+        return partial(model.predict, **config, classes=[0,73], verbose=False)
 
     def forward(self, image: Union[cv2.Mat, np.ndarray]) -> np.ndarray:
         """

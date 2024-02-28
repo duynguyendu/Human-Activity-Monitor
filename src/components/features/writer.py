@@ -39,7 +39,7 @@ class Writer:
         Returns:
             str: The formatted data.
         """
-        return ",".join(map(str, data)) if isinstance(data, list) else str(data)
+        return "|".join(map(str, data)) if isinstance(data, list) else str(data)
 
     def _now(self) -> str:
         """
@@ -66,7 +66,7 @@ class Writer:
         # Initialize first line
         self._write(
             path=self.holder[name]["path"],
-            contents=f"{'time' if self.camera else 'second'},{self._check_format(features)}\n",
+            contents=f"{'time' if self.camera else 'second'}|{self._check_format(features)}\n",
             append=False,
         )
 
@@ -109,6 +109,6 @@ class Writer:
         # Save values
         self._write(
             path=self.holder[name]["path"],
-            contents=f"{timestamp},{self._check_format(contents)}\n",
+            contents=f"{timestamp}|{self._check_format(contents)}\n",
             append=True,
         )

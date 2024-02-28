@@ -53,7 +53,7 @@ class Backbone:
         #   False by default
         self.status.update(
             {
-                process: False
+                process: True
                 for process in ["classifier", "heatmap", "track_box", "tracker"]
             }
         )

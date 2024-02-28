@@ -8,4 +8,6 @@ weights/*
 tests/*
 TODO.md
 records/*
+linux_venv/
+.idea/
 runs/*

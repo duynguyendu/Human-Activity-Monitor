@@ -46,10 +46,10 @@ class Video:
         Raises:
             FileExistsError: If the file is not found.
         """
-        if not os.path.exists(path):
-            raise FileExistsError(
-                "File not found. Check again or use an absolute path."
-            )
+        # if not os.path.exists(path):
+        #     raise FileExistsError(
+        #         "File not found. Check again or use an absolute path."
+        #     )
         self.path = str(path)
         self.video_capture = cv2.VideoCapture(path)
         self.is_camera = bool(self.total_frame == -1)
@@ -504,7 +504,7 @@ class Video:
     def run(self) -> None:
         """Runs the video playback loop"""
         for _ in self:
-            self.show()
+            # self.show()
 
             if not self.delay(self.wait):
                 break
