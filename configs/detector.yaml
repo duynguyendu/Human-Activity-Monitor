@@ -4,6 +4,9 @@
 detector:
   # Model confuration
   model:
+    # Model task
+    task: detect
+
     # Model weight path
     weight: weights/yolov8m.pt
 
