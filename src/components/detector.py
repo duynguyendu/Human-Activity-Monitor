@@ -1,6 +1,5 @@
 from typing import Dict, List, Tuple, Union
 from functools import partial
-import os
 
 from torch.nn import Module
 import numpy as np
@@ -15,7 +14,8 @@ from .utils import device_handler, check_half
 class Detector:
     def __init__(
         self,
-        weight: str = "weights/yolov8x.pt",
+        task: str,
+        weight: str = "weights/yolov8m.pt",
         conf: float = 0.25,
         iou: float = 0.7,
         size: Union[int, Tuple] = 640,
@@ -30,6 +30,7 @@ class Detector:
         Initialize the Yolo-v8 model
 
         Args:
+            weight (str): Task for YOLO model to perform (detect, classify).
             weight (str, optional): Path to the YOLO model weights file. Defaults to None.
             conf (float, optional): Confidence threshold for object detection. Defaults to 0.25.
             iou (float, optional): Intersection over Union (IoU) threshold. Defaults to 0.3.
@@ -41,10 +42,6 @@ class Detector:
             backend (str, optional): Backend to be used for model optimization. Defaults to None.
             device (str, optional): Device to run the model ('auto', 'cuda', or 'cpu'). Defaults to "auto".
         """
-
-        # Check model weight path
-        if not os.path.exists(weight):
-            raise FileNotFoundError(weight)
 
         # Check device
         self.device = device_handler(device)
@@ -58,8 +55,15 @@ class Detector:
             "device": self.device,
         }
 
+        # Check task
+        self.task = task.lower().strip()
+
+        if self.task not in ["detect", "classify"]:
+            raise ValueError('Only "detect" or "classify" task are acceptable.')
+
         # Setup model
         self.model = self.__setup_model(
+            task=self.task,
             weight=weight,
             fuse=fuse,
             format="onnx" if onnx else "pt",
@@ -80,11 +84,9 @@ class Detector:
         """
         return self.forward(image)
 
-    def __onnx_model(self):
-        ...
+    def __onnx_model(self): ...
 
-    def __tensorrt_model(self):
-        ...
+    def __tensorrt_model(self): ...
 
     def __compile(self, X: Module, backend: str) -> Module:
         """
@@ -119,6 +121,7 @@ class Detector:
 
     def __setup_model(
         self,
+        task: str,
         weight: str,
         fuse: bool,
         format: str,
@@ -130,6 +133,7 @@ class Detector:
         Create and configure the YOLO model based on the provided parameters.
 
         Args:
+            weight (str): Task for YOLO model to perform.
             weight (str): Path to the YOLO model weights file.
             fuse (bool): Fuse model layers for improved performance.
             format (str): Model format.
@@ -142,7 +146,7 @@ class Detector:
         """
 
         # Create an instance of the YOLO model
-        model = YOLO(model=weight, task="detect")
+        model = YOLO(model=weight, task=task)
 
         # Fuse model layers if specified
         if fuse:
@@ -153,7 +157,12 @@ class Detector:
             model = self.__compile(X=model, backend=backend)
 
         # Return a partially configured YOLO model
-        return partial(model.predict, **config, classes=[0,73], verbose=False)
+        return partial(
+            model.predict,
+            **config,
+            classes=0 if self.task == "detect" else None,
+            verbose=False
+        )
 
     def forward(self, image: Union[cv2.Mat, np.ndarray]) -> np.ndarray:
         """
@@ -169,5 +178,7 @@ class Detector:
         # Perform a forward pass of the model on the input image
         result = self.model(source=image)[0]
 
+        result = result.boxes if self.task == "detect" else result.probs
+
         # Get result
-        return result.boxes.data.cpu().numpy()
+        return result.data.cpu().numpy()

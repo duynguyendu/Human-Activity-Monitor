@@ -6,9 +6,9 @@ import hydra
 # Setup root directory
 from rootutils import autosetup
 
-autosetup()
-
 from components import Video
+
+autosetup()
 
 
 @hydra.main(config_path="../configs", config_name="run", version_base="1.3")

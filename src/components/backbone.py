@@ -49,13 +49,10 @@ class Backbone:
 
         # Process status:
         #   True by default
-        self.status = {"detector": True, "human_count": True}
+        self.status = {"detector": True, "human_count": True, "classifier": True}
         #   False by default
         self.status.update(
-            {
-                process: True
-                for process in ["classifier", "heatmap", "track_box", "tracker"]
-            }
+            {process: False for process in ["heatmap", "track_box", "tracker"]}
         )
 
         # Setup each process
@@ -97,9 +94,11 @@ class Backbone:
         # Set save path
         self.save_path = os.path.join(
             config["path"],
-            datetime.now().strftime("%d-%m-%Y")
-            if self.video.is_camera
-            else self.video.stem,
+            (
+                datetime.now().strftime("%d-%m-%Y")
+                if self.video.is_camera
+                else self.video.stem
+            ),
         )
 
         # Create destination folder
@@ -143,7 +142,7 @@ class Backbone:
         Returns:
             None
         """
-        self.classifier = Classifier(**config["model"], device=device)
+        self.classifier = Detector(**config["model"], device=device)
         self.show_classified = config["show"]
 
         if hasattr(self, "save_path") and config["save"]:
@@ -438,16 +437,20 @@ class Backbone:
                     # Get model output
                     classify_output = self.classifier(human_box)
 
+                    classify_label = ["other", "uniform"][np.argmax(classify_output)]
+
+                    classify_score = classify_output[np.argmax(classify_output)]
+
                     if self.__process_is_activate("tracker"):
-                        boxes_data.append({"id": int(box[5]), "data": classify_output})
+                        boxes_data.append({"id": int(box[5]), "data": classify_label})
 
                     # Format result
                     classify_result = ""
                     if self.show_classified["text"]:
-                        classify_result += classify_output["label"]
+                        classify_result += classify_label
 
                     if self.show_classified["score"]:
-                        classify_result += f' ({classify_output["score"]:.2})'
+                        classify_result += f" ({classify_score:.2})"
 
                     # Add to frame, color based on score
                     cv2.putText(
@@ -457,7 +460,7 @@ class Backbone:
                         fontFace=cv2.FONT_HERSHEY_SIMPLEX,
                         fontScale=1,
                         color=(
-                            self.dynamic_color(classify_output["score"])
+                            self.dynamic_color(classify_score)
                             if self.show_classified["dynamic_color"]
                             else 255
                         ),

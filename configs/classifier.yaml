@@ -2,28 +2,48 @@
 
 
 classifier:
+  # Model confuration
   model:
+    # Model task
+    task: classify
+
     # Model weight path
-    weight: weights/vit.pt
+    weight: weights/uniform.pt
 
-    # Size of image for the inference
-    image_size: 224
+    # Confidence threshold for detection
+    conf: 0.5
 
-    # Use half-precision (float16) instead of float32 for inference
+    # Intersection over Union
+    iou: 0.4
+
+    # Input size for the model
+    size: 480
+
+    # Use half precision (float16) for better inference
     half: true
 
+    # Fuse model layer
+    fuse: true
+
+    # Using onnx model
+    onnx: false
+
     # Use TorchDynamo, the latest method to speed up PyTorch code
-    optimize: null
+    optimize: true
 
+    # Backend to be used for model optimization
+    backend: null
+
+  # Draw output
   show:
-    # Result label
-    text: true
-
-    # Classification confidence score
+    # Detection confidence score
     score: false
 
-    # Dynamic color based on score
+    # Show dynamic color based on score
     dynamic_color: true
 
-  # Save output
+    # Box surrounding
+    text: true
+
+  # Save result
   save: true
