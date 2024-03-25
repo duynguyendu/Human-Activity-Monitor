@@ -131,6 +131,11 @@ class Backbone:
         self.detector = Detector(**config["model"], device=device)
         self.show_detected = config["show"]
 
+        config["model"]["weight"] = "weights/phone.pt"
+        config["model"]["conf"] = 0.4
+
+        self.phone_detector = Detector(**config["model"], device=device)
+
     def _setup_classifier(self, config: Dict, device: str) -> None:
         """
         Sets up the classifier module with the specified configuration.
@@ -146,7 +151,7 @@ class Backbone:
         self.show_classified = config["show"]
 
         if hasattr(self, "save_path") and config["save"]:
-            self.writer.new(name="classifier", type="csv", features="output")
+            self.writer.new(name="tracker", type="csv", features="output")
 
     def _setup_tracker(self, config: Dict, device: str) -> None:
         """
@@ -362,6 +367,8 @@ class Backbone:
 
             # Loop through the boxes
             for box in boxes:
+                data = {}
+
                 # xyxy location
                 x1, y1, x2, y2 = map(int, box[:4])
 
@@ -421,28 +428,38 @@ class Backbone:
                         thickness=2,
                     )
 
+                # Phone
+                if hasattr(self, "phone_detector"):
+                    data["action"] = "working"
+
+                    phone_result = self.phone_detector(frame)
+
+                    for phone in phone_result:
+                        # xyxy location
+                        p_x1, p_y1, p_x2, p_y2 = map(int, phone[:4])
+
+                        # Center point
+                        p_x_center = (p_x1 + p_x2) // 2
+                        p_y_center = (p_y1 + p_y2) // 2
+
+                        if (x1 <= p_x_center <= x2) and (y1 <= p_y_center <= y2):
+                            data["action"] = "phone"
+                            break
+
                 # Classification
                 if (
                     self.__process_is_activate("detector")
                     and self.__process_is_activate("classifier")
                     and self.show_classified
                 ):
-                    # Add box margin
-                    box_margin = 10
-                    human_box = frame[
-                        max(0, y1 - box_margin) : min(frame.shape[1], y2 + box_margin),
-                        max(0, x1 - box_margin) : min(frame.shape[1], x2 + box_margin),
-                    ]
-
                     # Get model output
-                    classify_output = self.classifier(human_box)
+                    classify_output = self.classifier(frame[y1:y2, x1:x2])
 
                     classify_label = ["other", "uniform"][np.argmax(classify_output)]
 
                     classify_score = classify_output[np.argmax(classify_output)]
 
-                    if self.__process_is_activate("tracker"):
-                        boxes_data.append({"id": int(box[5]), "data": classify_label})
+                    data["uniform"] = classify_label == "uniform"
 
                     # Format result
                     classify_result = ""
@@ -467,6 +484,10 @@ class Backbone:
                         thickness=2,
                     )
 
+                # Update tracker
+                if self.__process_is_activate("tracker"):
+                    boxes_data.append({"id": int(box[5]), "data": data})
+
                 # Update heatmap
                 if self.__process_is_activate("heatmap", background=True):
                     self.heatmap.check(area=(x1, y1, x2, y2))
@@ -476,9 +497,9 @@ class Backbone:
                     self.track_box.check(pos=center)
 
             # Save classifier output
-            if self.writer.has("classifier") and self.__process_is_activate("tracker"):
+            if self.writer.has("tracker") and self.__process_is_activate("tracker"):
                 self.writer.save(
-                    name="classifier", contents=str(boxes_data), progress=video_progress
+                    name="tracker", contents=str(boxes_data), progress=video_progress
                 )
 
             # Apply heatmap
