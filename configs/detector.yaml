@@ -11,7 +11,7 @@ detector:
     weight: weights/yolov8m.pt
 
     # Confidence threshold for detection
-    conf: 0.1
+    conf: 0.4
 
     # Intersection over Union
     iou: 0.4
