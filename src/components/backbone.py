@@ -49,10 +49,10 @@ class Backbone:
 
         # Process status:
         #   True by default
-        self.status = {"detector": True, "human_count": True, "classifier": True}
+        self.status = {"detector": True, "human_count": True, "classifier": True, "tracker": True}
         #   False by default
         self.status.update(
-            {process: False for process in ["heatmap", "track_box", "tracker"]}
+            {process: False for process in ["heatmap", "track_box"]}
         )
 
         # Setup each process

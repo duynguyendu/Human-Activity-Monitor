@@ -9,7 +9,7 @@ tracker:
   fp16: true
 
   # Number of frames before re-identification
-  max_age: 150
+  max_age: 300
 
   # Minimum number of confirmations to track
   min_hits: 3

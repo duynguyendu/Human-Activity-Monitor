@@ -11,3 +11,5 @@ records/*
 linux_venv/
 .idea/
 runs/*
+deer/
+outputs/
