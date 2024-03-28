@@ -3,6 +3,7 @@ from typing import Dict, Tuple, Union
 from collections import deque
 from datetime import datetime
 import itertools
+import signal
 import math
 import time
 import os
@@ -24,6 +25,7 @@ class Video:
         delay: int = 1,
         subsampling: int = 1,
         sync: bool = True,
+        show: bool = True,
         resolution: Tuple = None,
         progress_bar: bool = True,
         show_fps: Union[Dict, bool] = None,
@@ -38,6 +40,7 @@ class Video:
             delay (int, optional): Delay between frames in milliseconds. Defaults to 1.
             subsampling (int, optional): Skip frames during processing. Defaults to 1.
             sync (bool, optional): Synchronize video playback and frame processing. Defaults to True.
+            show (bool, optional): Show video playback. Defaults to True.
             resolution (Tuple, optional): Change resolution of the video. Defaults to None.
             progress_bar (bool, optional): Display progress bar during video playback. Defaults to True.
             show_fps (Dict or bool, optional): Display video real-time FPS. Default to None.
@@ -57,6 +60,7 @@ class Video:
         self.wait = int(delay)
         self.subsampling = max(1, int(subsampling))
         self.sync = bool(sync)
+        self.is_show = bool(show)
         self.resolution = tuple_handler(resolution, max_dim=2) if resolution else None
         self.__setup_progress_bar(show=progress_bar)
         self.__setup_fps_display(config=show_fps)
@@ -501,12 +505,21 @@ class Video:
             )
         cv2.imshow(self.stem, self.current_frame)
 
+    def signal_handler(self, sig, frame):
+        print("[INFO] [bold]Keyboard Interrupted:[/] [red]Exiting...[/]")
+        self.stop = True
+
     def run(self) -> None:
         """Runs the video playback loop"""
-        for _ in self:
-            self.show()
 
-            if not self.delay(self.wait):
+        self.stop = False
+        signal.signal(signal.SIGINT, self.signal_handler)
+
+        for _ in self:
+            if self.is_show:
+                self.show()
+
+            if not self.delay(self.wait) or self.stop:
                 break
 
         self.release()
@@ -527,9 +540,7 @@ class Video:
         self.pause = (
             True
             if key == ord(self.shortcuts["pause"])
-            else False
-            if key == ord(self.shortcuts["resume"])
-            else self.pause
+            else False if key == ord(self.shortcuts["resume"]) else self.pause
         )
 
         # Check features toggle
@@ -548,4 +559,4 @@ class Video:
             self.recorder.release()
         if hasattr(self, "backbone"):
             self.backbone.finish()
-        cv2.destroyWindow(self.stem)
+        cv2.destroyAllWindows()

@@ -49,16 +49,18 @@ class Backbone:
 
         # Process status:
         #   True by default
-        self.status = {"detector": True, "human_count": True, "classifier": True}
-        #   False by default
+        self.status = {
+            process: True for process in ["detector", "classifier", "tracker"]
+        }
         self.status.update(
-            {process: False for process in ["heatmap", "track_box", "tracker"]}
+            {process: False for process in ["track_box", "heatmap", "human_count"]}
         )
 
         # Setup each process
-        for process in self.status:
-            if process_config.get(process, False) or process_config["features"].get(
-                process, False
+        for process, initial in self.status.items():
+            if initial and (
+                process_config.get(process, False)
+                or process_config["features"].get(process, False)
             ):
                 args = (
                     [process_config["features"][process]]
@@ -430,9 +432,9 @@ class Backbone:
 
                 # Phone
                 if hasattr(self, "phone_detector"):
-                    data["action"] = "working"
-
                     phone_result = self.phone_detector(frame)
+
+                    data["action"] = {"type": "working", "conf": 1}
 
                     for phone in phone_result:
                         # xyxy location
@@ -443,7 +445,10 @@ class Backbone:
                         p_y_center = (p_y1 + p_y2) // 2
 
                         if (x1 <= p_x_center <= x2) and (y1 <= p_y_center <= y2):
-                            data["action"] = "phone"
+                            data["action"] = {
+                                "type": "phone",
+                                "conf": f"{phone[4]:.4}",
+                            }
                             break
 
                 # Classification
@@ -498,6 +503,7 @@ class Backbone:
 
             # Save classifier output
             if self.writer.has("tracker") and self.__process_is_activate("tracker"):
+                boxes_data = sorted(boxes_data, key=lambda x: x["id"])
                 self.writer.save(
                     name="tracker", contents=str(boxes_data), progress=video_progress
                 )
