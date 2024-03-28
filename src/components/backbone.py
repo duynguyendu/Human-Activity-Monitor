@@ -444,6 +444,7 @@ class Backbone:
 
                         if (x1 <= p_x_center <= x2) and (y1 <= p_y_center <= y2):
                             data["action"] = "phone"
+                            data["score"] = phone[4]
                             break
 
                 # Classification
