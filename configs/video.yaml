@@ -17,8 +17,11 @@ video:
   # Wait for processed frame
   sync: true
 
+  # Show the video
+  show: true
+
   # Video resolution
-  resolution: null
+  resolution: [1280, 720]
 
   # Display video progress
   progress_bar: true
