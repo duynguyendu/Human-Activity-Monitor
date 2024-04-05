@@ -15,8 +15,4 @@ defaults:
   - detector
   - classifier
   - tracker
-  - features:
-    - human_count
-    - heatmap
-    - track_box
 # -----------------------------------------------------

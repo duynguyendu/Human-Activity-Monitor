@@ -12,8 +12,7 @@ from cv2 import Mat
 import numpy as np
 import cv2
 
-from .features import *
-from . import *
+from . import Detector, Tracker, Writer
 
 
 class Backbone:
@@ -52,22 +51,13 @@ class Backbone:
         self.status = {
             process: True for process in ["detector", "classifier", "tracker"]
         }
-        self.status.update(
-            {process: False for process in ["track_box", "heatmap", "human_count"]}
-        )
 
         # Setup each process
         for process, initial in self.status.items():
-            if initial and (
-                process_config.get(process, False)
-                or process_config["features"].get(process, False)
-            ):
-                args = (
-                    [process_config["features"][process]]
-                    if process not in ["detector", "classifier", "tracker"]
-                    else [process_config[process], process_config["device"]]
+            if initial and (process_config.get(process, False)):
+                getattr(self, f"_setup_{process}")(
+                    process_config[process], process_config["device"]
                 )
-                getattr(self, f"_setup_{process}")(*args)
 
     def __call__(self, frame: Union[np.ndarray, Mat]) -> Union[np.ndarray, Mat]:
         """
@@ -171,70 +161,6 @@ class Backbone:
                 device=device,
             )
 
-    def _setup_human_count(self, config: Dict) -> None:
-        """
-        Sets up the human count module with the specified configuration.
-
-        Args:
-            config (Dict): Configuration settings for human count.
-
-        Returns:
-            None
-        """
-        self.human_count = HumanCount(smoothness=config["smoothness"])
-        self.human_count_position = config["position"]
-
-        if hasattr(self, "save_path") and config["save"]:
-            self.writer.new(name="human_count", type="csv", features="value")
-
-    def _setup_heatmap(self, config: Dict) -> None:
-        """
-        Sets up the heatmap module with the specified configuration.
-
-        Args:
-            config (Dict): Configuration settings for the heatmap.
-
-        Returns:
-            None
-        """
-        self.heatmap = Heatmap(shape=self.video.size(reverse=True), **config["layer"])
-        self.heatmap_opacity = config["opacity"]
-
-        if hasattr(self, "save_path") and config["save"]:
-            # Save video
-            if config["save"]["video"]:
-                self.heatmap.save_video(
-                    save_path=os.path.join(self.save_path, "heatmap.mp4"),
-                    fps=self.video.fps / self.video.subsampling,
-                    size=self.video.size(),
-                )
-            # Save image
-            if config["save"]["image"]:
-                self.heatmap.save_image(
-                    save_path=os.path.join(self.save_path, "heatmap.jpg"),
-                    size=self.video.size(reverse=True),
-                )
-
-    def _setup_track_box(self, config: Dict) -> None:
-        """
-        Sets up the track box module with the specified configuration.
-
-        Args:
-            config (Dict): Configuration settings for the track box.
-
-        Returns:
-            None
-        """
-        self.track_box = TrackBox(
-            default_config=config["default"], boxes=config["boxes"]
-        )
-        if hasattr(self, "save_path") and config["save"]:
-            self.writer.new(
-                name="track_box",
-                type="csv",
-                features=[box.name for box in self.track_box.boxes],
-            )
-
     @cached_property
     def __new_mask(self) -> np.ndarray:
         """
@@ -334,30 +260,6 @@ class Backbone:
         if self.__process_is_activate("detector", background=True):
             # Get detector output
             boxes = self.detector(frame)
-
-            # Human count
-            if hasattr(self, "human_count"):
-                # Update new value
-                self.human_count.update(value=len(boxes))
-
-                # Save output
-                if self.writer.has("human_count"):
-                    self.writer.save(
-                        name="human_count",
-                        contents=self.human_count.get_value(),
-                        progress=video_progress,
-                    )
-
-                # Add to frame
-                cv2.putText(
-                    img=mask,
-                    text=f"Person: {self.human_count.get_value()}",
-                    org=self.human_count_position,
-                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                    fontScale=1,
-                    color=(255, 255, 0),
-                    thickness=2,
-                )
 
             # Tracking
             if self.__process_is_activate("tracker"):
@@ -493,37 +395,12 @@ class Backbone:
                 if self.__process_is_activate("tracker"):
                     boxes_data.append({"id": int(box[5]), "data": data})
 
-                # Update heatmap
-                if self.__process_is_activate("heatmap", background=True):
-                    self.heatmap.check(area=(x1, y1, x2, y2))
-
-                # Check for track box
-                if self.__process_is_activate("track_box"):
-                    self.track_box.check(pos=center)
-
             # Save classifier output
             if self.writer.has("tracker") and self.__process_is_activate("tracker"):
                 boxes_data = sorted(boxes_data, key=lambda x: x["id"])
                 self.writer.save(
                     name="tracker", contents=str(boxes_data), progress=video_progress
                 )
-
-            # Apply heatmap
-            if self.__process_is_activate("heatmap", background=True):
-                self.heatmap.update()
-
-            # Add track box to frame
-            if hasattr(self, "track_box") and self.status["track_box"]:
-                self.track_box.update()
-                self.track_box.apply(mask)
-
-                # Save output
-                if self.writer.has("track_box"):
-                    self.writer.save(
-                        name="track_box",
-                        contents=[box.get_value() for box in self.track_box.boxes],
-                        progress=video_progress,
-                    )
 
         # Put result to a safe thread
         self.queue.put(mask)
@@ -553,17 +430,6 @@ class Backbone:
         # Return on result is empty and not mask
         elif not self.mask:
             return frame
-
-        # Enable heatmap
-        if self.__process_is_activate("heatmap") and hasattr(self.heatmap, "heatmap"):
-            cv2.addWeighted(
-                src1=self.heatmap.get(),
-                alpha=self.heatmap_opacity,
-                src2=frame if self.mask else self.overlay,
-                beta=1 - self.heatmap_opacity,
-                gamma=0,
-                dst=frame if self.mask else self.overlay,
-            )
 
         # Return overlay when not using mask
         if not self.mask:
