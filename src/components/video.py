@@ -503,6 +503,7 @@ class Video:
             raise ValueError(
                 "No current frame to show. Please run or loop through the video first."
             )
+        cv2.namedWindow(self.stem, cv2.WINDOW_KEEPRATIO)
         cv2.imshow(self.stem, self.current_frame)
 
     def signal_handler(self, sig, frame):
