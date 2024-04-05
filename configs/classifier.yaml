@@ -8,7 +8,7 @@ classifier:
     task: classify
 
     # Model weight path
-    weight: weights/uniform.pt
+    weight: weights/uniform.engine
 
     # Confidence threshold for detection
     conf: 0.8
@@ -17,7 +17,7 @@ classifier:
     iou: 0.4
 
     # Input size for the model
-    size: 640
+    size: 480
 
     # Use half precision (float16) for better inference
     half: true

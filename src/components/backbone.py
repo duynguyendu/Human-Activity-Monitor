@@ -123,7 +123,7 @@ class Backbone:
         self.detector = Detector(**config["model"], device=device)
         self.show_detected = config["show"]
 
-        config["model"]["weight"] = "weights/phone.pt"
+        config["model"]["weight"] = "weights/phone.engine"
         config["model"]["conf"] = 0.4
 
         self.phone_detector = Detector(**config["model"], device=device)
@@ -266,8 +266,18 @@ class Backbone:
                 # Get updated result
                 boxes = self.tracker.update(dets=boxes, image=frame)
 
+            # Phone
+            if hasattr(self, "phone_detector"):
+                phone_result = self.phone_detector(frame)
+
             # Initialize boxes data
             boxes_data = []
+
+            # Initialize zone
+            zone = {
+                "customer": np.array([[0, 0], [444, 0], [100, 720], [0, 720]]),
+                "worker": np.array([[444, 0], [1280, 0], [1280, 720], [100, 720]]),
+            }
 
             # Loop through the boxes
             for box in boxes:
@@ -279,6 +289,11 @@ class Backbone:
                 # Center point
                 center = ((x1 + x2) // 2, (y1 + y2) // 2)
 
+                # Check zone
+                for name in ["customer", "worker"]:
+                    if cv2.pointPolygonTest(zone[name], center, False) == 1:
+                        data["zone"] = name
+
                 # Check detector show options
                 if self.__process_is_activate("detector") and self.show_detected:
                     # Apply dynamic color
@@ -287,16 +302,6 @@ class Backbone:
                         if self.show_detected["dynamic_color"]
                         else 255
                     )
-
-                    # Show dot
-                    if self.show_detected["dot"]:
-                        cv2.circle(
-                            img=mask,
-                            center=center,
-                            radius=5,
-                            color=color,
-                            thickness=-1,
-                        )
 
                     # Show box
                     if self.show_detected["box"]:
@@ -320,7 +325,7 @@ class Backbone:
                             thickness=2,
                         )
 
-                # Show id it track
+                # Show id if track
                 if all(map(self.__process_is_activate, ["detector", "tracker"])):
                     cv2.putText(
                         img=mask,
@@ -332,64 +337,62 @@ class Backbone:
                         thickness=2,
                     )
 
-                # Phone
-                if hasattr(self, "phone_detector"):
-                    phone_result = self.phone_detector(frame)
+                if data["zone"] == "worker":
+                    # Phone
+                    if hasattr(self, "phone_detector"):
+                        data["action"] = {"type": "working", "conf": 1}
 
-                    data["action"] = {"type": "working", "conf": 1}
+                        for phone in phone_result:
+                            # xyxy location
+                            p_x1, p_y1, p_x2, p_y2 = map(int, phone[:4])
 
-                    for phone in phone_result:
-                        # xyxy location
-                        p_x1, p_y1, p_x2, p_y2 = map(int, phone[:4])
+                            # Center point
+                            p_x_center = (p_x1 + p_x2) // 2
+                            p_y_center = (p_y1 + p_y2) // 2
 
-                        # Center point
-                        p_x_center = (p_x1 + p_x2) // 2
-                        p_y_center = (p_y1 + p_y2) // 2
+                            if (x1 <= p_x_center <= x2) and (y1 <= p_y_center <= y2):
+                                data["action"] = {
+                                    "type": "phone",
+                                    "conf": f"{phone[4]:.4}",
+                                }
+                                break
 
-                        if (x1 <= p_x_center <= x2) and (y1 <= p_y_center <= y2):
-                            data["action"] = {
-                                "type": "phone",
-                                "conf": f"{phone[4]:.4}",
-                            }
-                            break
+                    # Classification
+                    if all(map(self.__process_is_activate, ["detector", "classifier"])):
+                        # Get model output
+                        classify_output = self.classifier(frame[y1:y2, x1:x2])
 
-                # Classification
-                if (
-                    self.__process_is_activate("detector")
-                    and self.__process_is_activate("classifier")
-                    and self.show_classified
-                ):
-                    # Get model output
-                    classify_output = self.classifier(frame[y1:y2, x1:x2])
+                        classify_label = ["other", "uniform"][
+                            np.argmax(classify_output)
+                        ]
 
-                    classify_label = ["other", "uniform"][np.argmax(classify_output)]
+                        classify_score = classify_output[np.argmax(classify_output)]
 
-                    classify_score = classify_output[np.argmax(classify_output)]
+                        data["uniform"] = classify_label == "uniform"
 
-                    data["uniform"] = classify_label == "uniform"
+                        if self.show_classified:
+                            # Format result
+                            classify_result = ""
+                            if self.show_classified["text"]:
+                                classify_result += classify_label
 
-                    # Format result
-                    classify_result = ""
-                    if self.show_classified["text"]:
-                        classify_result += classify_label
+                            if self.show_classified["score"]:
+                                classify_result += f" ({classify_score:.2})"
 
-                    if self.show_classified["score"]:
-                        classify_result += f" ({classify_score:.2})"
-
-                    # Add to frame, color based on score
-                    cv2.putText(
-                        img=mask,
-                        text=classify_result,
-                        org=(x1, y1 - 5),
-                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale=1,
-                        color=(
-                            self.dynamic_color(classify_score)
-                            if self.show_classified["dynamic_color"]
-                            else 255
-                        ),
-                        thickness=2,
-                    )
+                            # Add to frame, color based on score
+                            cv2.putText(
+                                img=mask,
+                                text=classify_result,
+                                org=(x1, y1 - 5),
+                                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                                fontScale=1,
+                                color=(
+                                    self.dynamic_color(classify_score)
+                                    if self.show_classified["dynamic_color"]
+                                    else 255
+                                ),
+                                thickness=2,
+                            )
 
                 # Update tracker
                 if self.__process_is_activate("tracker"):
