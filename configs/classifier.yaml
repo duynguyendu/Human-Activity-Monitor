@@ -11,25 +11,25 @@ classifier:
     weight: weights/uniform.pt
 
     # Confidence threshold for detection
-    conf: 0.5
+    conf: 0.8
 
     # Intersection over Union
     iou: 0.4
 
     # Input size for the model
-    size: 480
+    size: 640
 
     # Use half precision (float16) for better inference
     half: true
 
     # Fuse model layer
-    fuse: true
+    fuse: false
 
     # Using onnx model
     onnx: false
 
     # Use TorchDynamo, the latest method to speed up PyTorch code
-    optimize: true
+    optimize: false
 
     # Backend to be used for model optimization
     backend: null

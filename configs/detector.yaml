@@ -23,13 +23,13 @@ detector:
     half: true
 
     # Fuse model layer
-    fuse: true
+    fuse: false
 
     # Using onnx model
     onnx: false
 
     # Use TorchDynamo, the latest method to speed up PyTorch code
-    optimize: true
+    optimize: false
 
     # Backend to be used for model optimization
     backend: null
@@ -44,6 +44,3 @@ detector:
 
     # Box surrounding
     box: true
-
-    # Central dot
-    dot: false
