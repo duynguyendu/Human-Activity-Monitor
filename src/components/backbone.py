@@ -447,7 +447,7 @@ class Backbone:
                         if (x1 <= p_x_center <= x2) and (y1 <= p_y_center <= y2):
                             data["action"] = {
                                 "type": "phone",
-                                "conf": f"{phone[4]:.4}",
+                                "conf": phone[4],
                             }
                             break
 

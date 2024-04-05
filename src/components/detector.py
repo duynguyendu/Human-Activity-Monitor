@@ -149,12 +149,12 @@ class Detector:
         model = YOLO(model=weight, task=task)
 
         # Fuse model layers if specified
-        if fuse:
-            model.fuse()
+        # if fuse:
+        #     model.fuse()
 
         # Optimize the model using torch.compile if specified
-        if optimize:
-            model = self.__compile(X=model, backend=backend)
+        # if optimize:
+        #     model = self.__compile(X=model, backend=backend)
 
         # Return a partially configured YOLO model
         return partial(
