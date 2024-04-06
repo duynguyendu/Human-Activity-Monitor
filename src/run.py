@@ -6,7 +6,7 @@ import hydra
 # Setup root directory
 from rootutils import autosetup
 
-from components import Video
+from components.video import Video
 
 autosetup()
 

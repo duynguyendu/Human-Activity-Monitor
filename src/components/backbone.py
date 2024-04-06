@@ -12,8 +12,7 @@ from cv2 import Mat
 import numpy as np
 import cv2
 
-from .features import *
-from . import *
+from . import Detector, Tracker, Writer
 
 
 class Backbone:
@@ -52,22 +51,13 @@ class Backbone:
         self.status = {
             process: True for process in ["detector", "classifier", "tracker"]
         }
-        self.status.update(
-            {process: False for process in ["track_box", "heatmap", "human_count"]}
-        )
 
         # Setup each process
         for process, initial in self.status.items():
-            if initial and (
-                process_config.get(process, False)
-                or process_config["features"].get(process, False)
-            ):
-                args = (
-                    [process_config["features"][process]]
-                    if process not in ["detector", "classifier", "tracker"]
-                    else [process_config[process], process_config["device"]]
+            if initial and (process_config.get(process, False)):
+                getattr(self, f"_setup_{process}")(
+                    process_config[process], process_config["device"]
                 )
-                getattr(self, f"_setup_{process}")(*args)
 
     def __call__(self, frame: Union[np.ndarray, Mat]) -> Union[np.ndarray, Mat]:
         """
@@ -133,7 +123,7 @@ class Backbone:
         self.detector = Detector(**config["model"], device=device)
         self.show_detected = config["show"]
 
-        config["model"]["weight"] = "weights/phone.pt"
+        config["model"]["weight"] = "weights/phone.engine"
         config["model"]["conf"] = 0.4
 
         self.phone_detector = Detector(**config["model"], device=device)
@@ -169,70 +159,6 @@ class Backbone:
                 det_conf=self.detector.config["conf"],
                 det_iou=self.detector.config["iou"],
                 device=device,
-            )
-
-    def _setup_human_count(self, config: Dict) -> None:
-        """
-        Sets up the human count module with the specified configuration.
-
-        Args:
-            config (Dict): Configuration settings for human count.
-
-        Returns:
-            None
-        """
-        self.human_count = HumanCount(smoothness=config["smoothness"])
-        self.human_count_position = config["position"]
-
-        if hasattr(self, "save_path") and config["save"]:
-            self.writer.new(name="human_count", type="csv", features="value")
-
-    def _setup_heatmap(self, config: Dict) -> None:
-        """
-        Sets up the heatmap module with the specified configuration.
-
-        Args:
-            config (Dict): Configuration settings for the heatmap.
-
-        Returns:
-            None
-        """
-        self.heatmap = Heatmap(shape=self.video.size(reverse=True), **config["layer"])
-        self.heatmap_opacity = config["opacity"]
-
-        if hasattr(self, "save_path") and config["save"]:
-            # Save video
-            if config["save"]["video"]:
-                self.heatmap.save_video(
-                    save_path=os.path.join(self.save_path, "heatmap.mp4"),
-                    fps=self.video.fps / self.video.subsampling,
-                    size=self.video.size(),
-                )
-            # Save image
-            if config["save"]["image"]:
-                self.heatmap.save_image(
-                    save_path=os.path.join(self.save_path, "heatmap.jpg"),
-                    size=self.video.size(reverse=True),
-                )
-
-    def _setup_track_box(self, config: Dict) -> None:
-        """
-        Sets up the track box module with the specified configuration.
-
-        Args:
-            config (Dict): Configuration settings for the track box.
-
-        Returns:
-            None
-        """
-        self.track_box = TrackBox(
-            default_config=config["default"], boxes=config["boxes"]
-        )
-        if hasattr(self, "save_path") and config["save"]:
-            self.writer.new(
-                name="track_box",
-                type="csv",
-                features=[box.name for box in self.track_box.boxes],
             )
 
     @cached_property
@@ -335,37 +261,23 @@ class Backbone:
             # Get detector output
             boxes = self.detector(frame)
 
-            # Human count
-            if hasattr(self, "human_count"):
-                # Update new value
-                self.human_count.update(value=len(boxes))
-
-                # Save output
-                if self.writer.has("human_count"):
-                    self.writer.save(
-                        name="human_count",
-                        contents=self.human_count.get_value(),
-                        progress=video_progress,
-                    )
-
-                # Add to frame
-                cv2.putText(
-                    img=mask,
-                    text=f"Person: {self.human_count.get_value()}",
-                    org=self.human_count_position,
-                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                    fontScale=1,
-                    color=(255, 255, 0),
-                    thickness=2,
-                )
-
             # Tracking
             if self.__process_is_activate("tracker"):
                 # Get updated result
                 boxes = self.tracker.update(dets=boxes, image=frame)
 
+            # Phone
+            if hasattr(self, "phone_detector"):
+                phone_result = self.phone_detector(frame)
+
             # Initialize boxes data
             boxes_data = []
+
+            # Initialize zone
+            zone = {
+                "customer": np.array([[0, 0], [444, 0], [100, 720], [0, 720]]),
+                "worker": np.array([[444, 0], [1280, 0], [1280, 720], [100, 720]]),
+            }
 
             # Loop through the boxes
             for box in boxes:
@@ -377,6 +289,11 @@ class Backbone:
                 # Center point
                 center = ((x1 + x2) // 2, (y1 + y2) // 2)
 
+                # Check zone
+                for name in ["customer", "worker"]:
+                    if cv2.pointPolygonTest(zone[name], center, False) == 1:
+                        data["zone"] = name
+
                 # Check detector show options
                 if self.__process_is_activate("detector") and self.show_detected:
                     # Apply dynamic color
@@ -385,16 +302,6 @@ class Backbone:
                         if self.show_detected["dynamic_color"]
                         else 255
                     )
-
-                    # Show dot
-                    if self.show_detected["dot"]:
-                        cv2.circle(
-                            img=mask,
-                            center=center,
-                            radius=5,
-                            color=color,
-                            thickness=-1,
-                        )
 
                     # Show box
                     if self.show_detected["box"]:
@@ -418,7 +325,7 @@ class Backbone:
                             thickness=2,
                         )
 
-                # Show id it track
+                # Show id if track
                 if all(map(self.__process_is_activate, ["detector", "tracker"])):
                     cv2.putText(
                         img=mask,
@@ -430,76 +337,66 @@ class Backbone:
                         thickness=2,
                     )
 
-                # Phone
-                if hasattr(self, "phone_detector"):
-                    phone_result = self.phone_detector(frame)
+                if data["zone"] == "worker":
+                    # Phone
+                    if hasattr(self, "phone_detector"):
+                        data["action"] = {"type": "working", "conf": 1}
 
-                    data["action"] = {"type": "working", "conf": 1}
+                        for phone in phone_result:
+                            # xyxy location
+                            p_x1, p_y1, p_x2, p_y2 = map(int, phone[:4])
 
-                    for phone in phone_result:
-                        # xyxy location
-                        p_x1, p_y1, p_x2, p_y2 = map(int, phone[:4])
+                            # Center point
+                            p_x_center = (p_x1 + p_x2) // 2
+                            p_y_center = (p_y1 + p_y2) // 2
 
-                        # Center point
-                        p_x_center = (p_x1 + p_x2) // 2
-                        p_y_center = (p_y1 + p_y2) // 2
+                            if (x1 <= p_x_center <= x2) and (y1 <= p_y_center <= y2):
+                                data["action"] = {
+                                    "type": "phone",
+                                    "conf": phone[4],
+                                }
+                                break
 
-                        if (x1 <= p_x_center <= x2) and (y1 <= p_y_center <= y2):
-                            data["action"] = {
-                                "type": "phone",
-                                "conf": phone[4],
-                            }
-                            break
+                    # Classification
+                    if all(map(self.__process_is_activate, ["detector", "classifier"])):
+                        # Get model output
+                        classify_output = self.classifier(frame[y1:y2, x1:x2])
 
-                # Classification
-                if (
-                    self.__process_is_activate("detector")
-                    and self.__process_is_activate("classifier")
-                    and self.show_classified
-                ):
-                    # Get model output
-                    classify_output = self.classifier(frame[y1:y2, x1:x2])
+                        classify_label = ["other", "uniform"][
+                            np.argmax(classify_output)
+                        ]
 
-                    classify_label = ["other", "uniform"][np.argmax(classify_output)]
+                        classify_score = classify_output[np.argmax(classify_output)]
 
-                    classify_score = classify_output[np.argmax(classify_output)]
+                        data["uniform"] = classify_label == "uniform"
 
-                    data["uniform"] = classify_label == "uniform"
+                        if self.show_classified:
+                            # Format result
+                            classify_result = ""
+                            if self.show_classified["text"]:
+                                classify_result += classify_label
 
-                    # Format result
-                    classify_result = ""
-                    if self.show_classified["text"]:
-                        classify_result += classify_label
+                            if self.show_classified["score"]:
+                                classify_result += f" ({classify_score:.2})"
 
-                    if self.show_classified["score"]:
-                        classify_result += f" ({classify_score:.2})"
-
-                    # Add to frame, color based on score
-                    cv2.putText(
-                        img=mask,
-                        text=classify_result,
-                        org=(x1, y1 - 5),
-                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale=1,
-                        color=(
-                            self.dynamic_color(classify_score)
-                            if self.show_classified["dynamic_color"]
-                            else 255
-                        ),
-                        thickness=2,
-                    )
+                            # Add to frame, color based on score
+                            cv2.putText(
+                                img=mask,
+                                text=classify_result,
+                                org=(x1, y1 - 5),
+                                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                                fontScale=1,
+                                color=(
+                                    self.dynamic_color(classify_score)
+                                    if self.show_classified["dynamic_color"]
+                                    else 255
+                                ),
+                                thickness=2,
+                            )
 
                 # Update tracker
                 if self.__process_is_activate("tracker"):
                     boxes_data.append({"id": int(box[5]), "data": data})
-
-                # Update heatmap
-                if self.__process_is_activate("heatmap", background=True):
-                    self.heatmap.check(area=(x1, y1, x2, y2))
-
-                # Check for track box
-                if self.__process_is_activate("track_box"):
-                    self.track_box.check(pos=center)
 
             # Save classifier output
             if self.writer.has("tracker") and self.__process_is_activate("tracker"):
@@ -507,23 +404,6 @@ class Backbone:
                 self.writer.save(
                     name="tracker", contents=str(boxes_data), progress=video_progress
                 )
-
-            # Apply heatmap
-            if self.__process_is_activate("heatmap", background=True):
-                self.heatmap.update()
-
-            # Add track box to frame
-            if hasattr(self, "track_box") and self.status["track_box"]:
-                self.track_box.update()
-                self.track_box.apply(mask)
-
-                # Save output
-                if self.writer.has("track_box"):
-                    self.writer.save(
-                        name="track_box",
-                        contents=[box.get_value() for box in self.track_box.boxes],
-                        progress=video_progress,
-                    )
 
         # Put result to a safe thread
         self.queue.put(mask)
@@ -553,17 +433,6 @@ class Backbone:
         # Return on result is empty and not mask
         elif not self.mask:
             return frame
-
-        # Enable heatmap
-        if self.__process_is_activate("heatmap") and hasattr(self.heatmap, "heatmap"):
-            cv2.addWeighted(
-                src1=self.heatmap.get(),
-                alpha=self.heatmap_opacity,
-                src2=frame if self.mask else self.overlay,
-                beta=1 - self.heatmap_opacity,
-                gamma=0,
-                dst=frame if self.mask else self.overlay,
-            )
 
         # Return overlay when not using mask
         if not self.mask:

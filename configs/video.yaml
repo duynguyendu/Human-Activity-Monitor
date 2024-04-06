@@ -35,15 +35,15 @@ video:
     position: [20, 40]
 
   # Record video
-  record:
-    # Save destination
-    path: records
+  # record:
+  #   # Save destination
+  #   path: records
 
-    # Save name
-    name: output
+  #   # Save name
+  #   name: output
 
-    # Custom fps (null for auto)
-    fps: null
+  #   # Custom fps (null for auto)
+  #   fps: null
 
-    # Output resolution (null for auto)
-    resolution: null
+  #   # Output resolution (null for auto)
+  #   resolution: null
