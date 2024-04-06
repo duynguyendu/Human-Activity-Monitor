@@ -123,7 +123,7 @@ class Backbone:
         self.detector = Detector(**config["model"], device=device)
         self.show_detected = config["show"]
 
-        config["model"]["weight"] = "weights/phone.engine"
+        config["model"]["weight"] = "weights/phone.pt"
         config["model"]["conf"] = 0.4
 
         self.phone_detector = Detector(**config["model"], device=device)

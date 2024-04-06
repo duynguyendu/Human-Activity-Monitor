@@ -8,7 +8,7 @@ classifier:
     task: classify
 
     # Model weight path
-    weight: weights/uniform.engine
+    weight: weights/uniform.pt
 
     # Confidence threshold for detection
     conf: 0.8
