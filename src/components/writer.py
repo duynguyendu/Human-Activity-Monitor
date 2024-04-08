@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Union
+import os
 
 
 class Writer:
@@ -61,14 +62,8 @@ class Writer:
         """
 
         # Create new holder
-        self.holder[name] = {"path": f"{self.path}/{name}.{type}", "current": 0}
-
-        # Initialize first line
-        self._write(
-            path=self.holder[name]["path"],
-            contents=f"{'time' if self.camera else 'second'}|{self._check_format(features)}\n",
-            append=False,
-        )
+        self.holder[name] = {"path": f"{self.path}/{name}.{type}", "current": 0, "splitNum": 1, "written": 0, "name": name, "type": type, "features": features}
+        open(self.holder[name]["path"], 'w+').close()
 
     def has(self, name: str) -> bool:
         """
@@ -103,6 +98,13 @@ class Writer:
         if progress % self.interval != 0:
             return
 
+        holder = self.holder[name]
+        if holder["written"] % 600 == 0 and holder["written"] != 0:
+            os.rename(holder["path"], f'{self.path}/{holder["name"]}_{holder["splitNum"]}.{holder["type"]}')
+            open(holder["path"], "w").close()
+            holder["splitNum"] += 1
+            holder["written"] = 0
+        
         # Format timestamp
         timestamp = self._now() if self.camera else progress
 
@@ -112,3 +114,4 @@ class Writer:
             contents=f"{timestamp}|{self._check_format(contents)}\n",
             append=True,
         )
+        holder["written"] += 1
