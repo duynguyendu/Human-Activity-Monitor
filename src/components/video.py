@@ -7,6 +7,8 @@ import signal
 import math
 import time
 import os
+import sys
+import fcntl
 
 from rich import print
 from tqdm import tqdm
@@ -522,6 +524,16 @@ class Video:
 
             if not self.delay(self.wait) or self.stop:
                 break
+                
+            # handle capture command: `capture <filename>`
+            data = self.read_stdin_nonblocking()
+            if data:
+                args = data.split()
+                if args[0] == "capture":
+                    try:
+                        cv2.imwrite(args[1], self.current_frame)
+                    except Exception:
+                        pass
 
         self.release()
 
@@ -561,3 +573,17 @@ class Video:
         if hasattr(self, "backbone"):
             self.backbone.finish()
         cv2.destroyAllWindows()
+        
+    def read_stdin_nonblocking(self):
+        fd = sys.stdin.fileno()  # Get the file descriptor for stdin
+        flags = fcntl.fcntl(fd, fcntl.F_GETFL)  # Get current file descriptor flags
+        fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)  # Set non-blocking mode
+
+        try:
+            data = sys.stdin.read()  # Attempt to read data
+        except Exception:  # Handle case where no data is available
+            data = ""
+        finally:
+            fcntl.fcntl(fd, fcntl.F_SETFL, flags)  # Restore original flags (optional)
+
+        return data
