@@ -530,10 +530,11 @@ class Video:
             if data:
                 args = data.split()
                 if args[0] == "capture":
+                    print("capturing image to", args[1])
                     try:
                         cv2.imwrite(args[1], self.current_frame)
-                    except Exception:
-                        pass
+                    except Exception as ex:
+                        print(ex)
 
         self.release()
 
