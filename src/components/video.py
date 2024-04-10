@@ -535,7 +535,7 @@ class Video:
             data = self.read_stdin_nonblocking()
             if data:
                 args = data.split()
-                if args[0] == "capture":
+                if len(args) != 0 and args[0] == "capture":
                     print("capturing image to", args[1])
                     try:
                         cv2.imwrite(args[1], self.current_frame)
