@@ -542,7 +542,7 @@ class Video:
                     except Exception as ex:
                         traceback.print_exception(type(ex), ex, ex.__traceback__)
 
-    self.release()
+        self.release()
 
     def delay(self, value: int) -> bool:
         """
