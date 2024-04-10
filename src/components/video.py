@@ -205,32 +205,6 @@ class Video:
 
         return wrapper
 
-    def __iter__(self) -> "Video":
-        """
-        Initialize video iteration.
-
-        Returns:
-            Video: The video object.
-        """
-
-        # Video iteration generate
-        def generate():
-            try:
-                for _, frame in iter(self.video_capture.read, (False, None)):
-                    print("frame1")
-                    yield frame
-            except Exception as ex:
-                traceback.print_exception(type(ex), ex, ex.__traceback__)
-
-        # Generate frame queue
-        self.queue = itertools.islice(generate(), 0, None, self.speed)
-
-        # Initialize
-        self.current_progress = 0
-        self.pause = False
-
-        return self
-
     @__resync
     def __next__(self) -> Union[cv2.Mat, np.ndarray]:
         """
@@ -312,15 +286,6 @@ class Video:
         """
         return self.name.split(".")[0]
 
-    @cached_property
-    def cap(self) -> cv2.VideoCapture:
-        """
-        Return video capture
-
-        Returns:
-            VideoCapture
-        """
-        return self.video_capture
 
     @cached_property
     def total_frame(self) -> int:
@@ -330,7 +295,7 @@ class Video:
         Returns:
             int: total frame
         """
-        return int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        return int(self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
 
     @cached_property
     def fps(self) -> int:
@@ -340,7 +305,7 @@ class Video:
         Returns:
             int: FPS of the video
         """
-        return int(self.cap.get(cv2.CAP_PROP_FPS))
+        return int(self.video_capture.get(cv2.CAP_PROP_FPS))
 
     @cached_property
     def shortcuts(self) -> Dict:
@@ -398,7 +363,7 @@ class Video:
             self.resolution
             if self.resolution
             else (
-                int(self.cap.get(prop))
+                int(self.video_capture.get(prop))
                 for prop in [cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT]
             )
         )
