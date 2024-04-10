@@ -205,6 +205,32 @@ class Video:
 
         return wrapper
 
+    def __iter__(self) -> "Video":
+        """
+        Initialize video iteration.
+
+        Returns:
+            Video: The video object.
+        """
+
+        # Video iteration generate
+        def generate():
+            try:
+                for _, frame in iter(self.video_capture.read, (False, None)):
+                    print("frame1")
+                    yield frame
+            except Exception as ex:
+                traceback.print_exception(type(ex), ex, ex.__traceback__)
+
+        # Generate frame queue
+        self.queue = itertools.islice(generate(), 0, None, self.speed)
+
+        # Initialize
+        self.current_progress = 0
+        self.pause = False
+
+        return self
+
     @__resync
     def __next__(self) -> Union[cv2.Mat, np.ndarray]:
         """
@@ -216,14 +242,10 @@ class Video:
 
         # Get current frame
         ret, new_frame = self.video_capture.read()
-        i = 0
         while not ret:
             print("oh no, missing frame, fml, creating new connection then")
-            i += 1
-            if i == 3:
-                self.video_capture.release()
-                self.video_capture = cv2.VideoCapture(self.path, cv2.CAP_FFMPEG)
-                i = 0
+            self.video_capture.release()
+            self.video_capture = cv2.VideoCapture(self.path, cv2.CAP_FFMPEG)
             ret, new_frame = self.video_capture.read()
         
         self.current_frame = new_frame
@@ -290,6 +312,15 @@ class Video:
         """
         return self.name.split(".")[0]
 
+    @cached_property
+    def cap(self) -> cv2.VideoCapture:
+        """
+        Return video capture
+
+        Returns:
+            VideoCapture
+        """
+        return self.video_capture
 
     @cached_property
     def total_frame(self) -> int:
@@ -299,7 +330,7 @@ class Video:
         Returns:
             int: total frame
         """
-        return int(self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        return int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
     @cached_property
     def fps(self) -> int:
@@ -309,7 +340,7 @@ class Video:
         Returns:
             int: FPS of the video
         """
-        return int(self.video_capture.get(cv2.CAP_PROP_FPS))
+        return int(self.cap.get(cv2.CAP_PROP_FPS))
 
     @cached_property
     def shortcuts(self) -> Dict:
@@ -367,7 +398,7 @@ class Video:
             self.resolution
             if self.resolution
             else (
-                int(self.video_capture.get(prop))
+                int(self.cap.get(prop))
                 for prop in [cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT]
             )
         )
@@ -499,11 +530,11 @@ class Video:
         self.stop = False
         signal.signal(signal.SIGINT, self.signal_handler)
 
-        for _ in self:
+        while not self.stop:
             if self.is_show:
                 self.show()
 
-            if not self.delay(self.wait) or self.stop:
+            if not self.delay(self.wait):
                 break
                 
             # handle capture command: `capture <filename>`
