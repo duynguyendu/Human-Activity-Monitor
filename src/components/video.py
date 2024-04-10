@@ -241,10 +241,11 @@ class Video:
         """
 
         # Get current frame
-        try:
-            _, self.current_frame = self.video_capture.read()
-        except Exception as ex:
-            traceback.print_exception(type(ex), ex, ex.__traceback__)
+        ret, new_frame = self.video_capture.read()
+        if not ret:
+            return self.current_frame
+        
+        self.current_frame = new_frame
 
         # Change video resolution
         if self.resolution:
