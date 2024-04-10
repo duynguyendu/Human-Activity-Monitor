@@ -214,8 +214,11 @@ class Video:
 
         # Video iteration generate
         def generate():
-            for _, frame in iter(self.video_capture.read, (False, None)):
-                yield frame
+            try:
+                for _, frame in iter(self.video_capture.read, (False, None)):
+                    yield frame
+            except Exception as ex:
+                traceback.print_exception(type(ex), ex, ex.__traceback__)
 
         # Generate frame queue
         self.queue = itertools.islice(generate(), 0, None, self.speed)
@@ -236,7 +239,10 @@ class Video:
         """
 
         # Get current frame
-        self.current_frame = next(self.queue)
+        try:
+            self.current_frame = next(self.queue)
+        except Exception as ex:
+            traceback.print_exception(type(ex), ex, ex.__traceback__)
 
         # Change video resolution
         if self.resolution:
@@ -534,9 +540,9 @@ class Video:
                     try:
                         cv2.imwrite(args[1], self.current_frame)
                     except Exception as ex:
-                        print(ex)
+                        traceback.print_exception(type(ex), ex, ex.__traceback__)
 
-        self.release()
+    self.release()
 
     def delay(self, value: int) -> bool:
         """
