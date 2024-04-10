@@ -242,7 +242,7 @@ class Video:
 
         # Get current frame
         try:
-            self.current_frame = self.video_capture.read
+            _, self.current_frame = self.video_capture.read()
         except Exception as ex:
             traceback.print_exception(type(ex), ex, ex.__traceback__)
 
