@@ -244,6 +244,7 @@ class Video:
         ret, new_frame = self.video_capture.read()
         if not ret:
             print("oh no, missing frame, fml")
+            print("is cv open: ", self.video_capture.isOpened())
             return self.current_frame
         
         self.current_frame = new_frame
