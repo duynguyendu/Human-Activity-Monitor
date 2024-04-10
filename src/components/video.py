@@ -243,6 +243,7 @@ class Video:
         # Get current frame
         ret, new_frame = self.video_capture.read()
         if not ret:
+            print("oh no, missing frame, fml")
             return self.current_frame
         
         self.current_frame = new_frame
