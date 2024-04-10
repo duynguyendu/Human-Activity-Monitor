@@ -216,9 +216,14 @@ class Video:
 
         # Get current frame
         ret, new_frame = self.video_capture.read()
+        i = 0
         while not ret:
             print("oh no, missing frame, fml, creating new connection then")
-            self.video_capture = cv2.VideoCapture(self.path, cv2.CAP_FFMPEG)
+            i += 1
+            if i == 3:
+                self.video_capture.release()
+                self.video_capture = cv2.VideoCapture(self.path, cv2.CAP_FFMPEG)
+                i = 0
             ret, new_frame = self.video_capture.read()
         
         self.current_frame = new_frame
