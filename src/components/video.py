@@ -9,6 +9,7 @@ import time
 import os
 import sys
 import fcntl
+import traceback
 
 from rich import print
 from tqdm import tqdm
