@@ -217,6 +217,7 @@ class Video:
         def generate():
             try:
                 for _, frame in iter(self.video_capture.read, (False, None)):
+                    print("frame1")
                     yield frame
             except Exception as ex:
                 traceback.print_exception(type(ex), ex, ex.__traceback__)
@@ -241,7 +242,7 @@ class Video:
 
         # Get current frame
         try:
-            self.current_frame = next(self.queue)
+            self.current_frame = self.video_capture.read
         except Exception as ex:
             traceback.print_exception(type(ex), ex, ex.__traceback__)
 
