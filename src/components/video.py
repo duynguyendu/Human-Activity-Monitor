@@ -68,6 +68,8 @@ class Video:
         self.__setup_progress_bar(show=progress_bar)
         self.__setup_fps_display(config=show_fps)
         self.__setup_recorder(config=record)
+        self.stop = False
+        self.current_progress = 0
 
     def __check_speed(self, value: Union[int, float]) -> None:
         """
@@ -526,58 +528,26 @@ class Video:
 
     def run(self) -> None:
         """Runs the video playback loop"""
-
-        self.stop = False
-        self.pause = False
         signal.signal(signal.SIGINT, self.signal_handler)
 
         while not self.stop:
-            if self.is_show:
-                self.show()
-
-            if not self.delay(self.wait):
-                break
-                
+            self.__next__()
+            
             # handle capture command: `capture <filename>`
             data = self.read_stdin_nonblocking()
             if data:
-                args = data.split()
-                if len(args) != 0 and args[0] == "capture":
-                    print("capturing image to", args[1])
-                    try:
-                        cv2.imwrite(args[1], self.current_frame)
-                    except Exception as ex:
-                        traceback.print_exception(type(ex), ex, ex.__traceback__)
+                print("receive data", data)
+                commands = data.splitlines()
+                for c in commands:
+                    args = c.split()
+                    if len(args) != 0 and args[0] == "capture":
+                        print("capturing image to", args[1])
+                        try:
+                            cv2.imwrite(args[1], self.current_frame)
+                        except Exception as ex:
+                            traceback.print_exception(type(ex), ex, ex.__traceback__)
 
         self.release()
-
-    def delay(self, value: int) -> bool:
-        """
-        Video delay
-
-        Args:
-            value (int): millisecond
-
-        Returns:
-            bool: True if continue else False
-        """
-        key = cv2.waitKey(value if not self.pause else 0) & 0xFF
-
-        # Check pause status
-        self.pause = (
-            True
-            if key == ord(self.shortcuts["pause"])
-            else False if key == ord(self.shortcuts["resume"]) else self.pause
-        )
-
-        # Check features toggle
-        if hasattr(self, "backbone"):
-            for process in self.backbone.status:
-                if process != "human_count" and key == ord(self.shortcuts[process]):
-                    self.backbone.status[process] = not self.backbone.status[process]
-
-        # Check continue
-        return True if not key == ord("q") else False
 
     def release(self) -> None:
         """Release capture"""
