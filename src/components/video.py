@@ -528,6 +528,7 @@ class Video:
         """Runs the video playback loop"""
 
         self.stop = False
+        self.pause = False
         signal.signal(signal.SIGINT, self.signal_handler)
 
         while not self.stop:
