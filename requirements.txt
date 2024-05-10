@@ -1,15 +1,12 @@
 # essensial
-numpy==1.24.4
+numpy==1.13.3.
 
 # image
-opencv-python>=4.8.0
+opencv-python==4.1.1
 
 # torch
-torch>=2.0.0
-torchvision>=0.15.0
-
-# yolo-v8
-ultralytics>=8.0.2
+torch==1.10.0
+torchvision==0.11.1
 
 # tracking
 boxmot>=10.0.47

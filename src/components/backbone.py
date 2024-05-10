@@ -123,7 +123,7 @@ class Backbone:
         self.detector = Detector(**config["model"], device=device)
         self.show_detected = config["show"]
 
-        config["model"]["weight"] = "weights/phone.pt"
+        config["model"]["weight"] = "weights/phone.ver2.pt"
         config["model"]["conf"] = 0.4
 
         self.phone_detector = Detector(**config["model"], device=device)
@@ -293,6 +293,9 @@ class Backbone:
                 for name in ["customer", "worker"]:
                     if cv2.pointPolygonTest(zone[name], center, False) == 1:
                         data["zone"] = name
+                 
+                if "zone" not in data:
+                    continue
 
                 # Check detector show options
                 if self.__process_is_activate("detector") and self.show_detected:
@@ -360,7 +363,11 @@ class Backbone:
                     # Classification
                     if all(map(self.__process_is_activate, ["detector", "classifier"])):
                         # Get model output
-                        classify_output = self.classifier(frame[y1:y2, x1:x2])
+                        uniform_y1 = y1 - 25 if y1 >= 25 else 0;
+                        uniform_y2 = y2 + 25 if y2 <= 695 else 720;
+                        uniform_x1 = x1 - 25 if x1 >= 25 else 0;
+                        uniform_x2 = x2 + 25 if x1 <= 1255 else 0;
+                        classify_output = self.classifier(frame[uniform_y1:uniform_y2, uniform_x1:uniform_x2])
 
                         classify_label = ["other", "uniform"][
                             np.argmax(classify_output)
@@ -378,6 +385,9 @@ class Backbone:
 
                             if self.show_classified["score"]:
                                 classify_result += f" ({classify_score:.2})"
+
+                            if data["action"]["type"] == "phone":
+                                classify_result += " phone"
 
                             # Add to frame, color based on score
                             cv2.putText(

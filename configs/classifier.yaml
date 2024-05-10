@@ -8,10 +8,10 @@ classifier:
     task: classify
 
     # Model weight path
-    weight: weights/uniform.pt
+    weight: weights/uniform.classify.pt
 
     # Confidence threshold for detection
-    conf: 0.8
+    conf: 0.7
 
     # Intersection over Union
     iou: 0.4
