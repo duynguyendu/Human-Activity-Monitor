@@ -57,7 +57,7 @@ class Video:
         #         "File not found. Check again or use an absolute path."
         #     )
         self.path = str(path)
-        self.video_capture = cv2.VideoCapture(path, cv2.CAP_FFMPEG)
+        self.video_capture = cv2.VideoCapture(path)
         self.video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         self.is_camera = bool(self.total_frame == -1)
