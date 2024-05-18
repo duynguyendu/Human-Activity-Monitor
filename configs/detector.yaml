@@ -8,7 +8,7 @@ detector:
     task: detect
 
     # Model weight path
-    weight: weights/yolov8n.pt
+    weight: weights/yolov8s.pt
 
     # Confidence threshold for detection
     conf: 0.4
