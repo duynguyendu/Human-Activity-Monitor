@@ -275,7 +275,7 @@ class Backbone:
 
             # Initialize zone
             zone = {
-                "customer": np.array([[0, 0], [444, 0], [100, 720], [0, 720]]),
+                "customer": np.array([[0, 100], [444, 100], [100, 720], [0, 720]]),
                 "worker": np.array([[444, 0], [1280, 0], [1280, 720], [100, 720]]),
             }
 
